@@ -1,0 +1,68 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\froman\fcharset0 Times-Roman;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;}
+{\*\expandedcolortbl;;\cssrgb\c0\c0\c0;}
+\margl1440\margr1440\vieww21000\viewh13760\viewkind0
+\deftab720
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \expnd0\expndtw0\kerning0
+  Where an LSTM helps is with partial observability and noise \'97 specifically when velocity comes from noisy VIO\
+  rather than ground truth. The critique is right to flag this: in the competition, velocity comes from onboard\
+  estimation, not a motion capture system. The cheapest fix that directly addresses this is observation history\
+  concatenation (stack last K=3\'965 observations \uc0\u8594  36\'9660D input, same MLP). This:\
+  - Handles latency and estimation noise without LSTM training instability\
+  - Is the architecture the critique recommends as the "simplest defensible choice"\
+  - Costs 20 lines of code and adds no training complexity\
+\
+  A GRU/LSTM makes sense later as an extension when you add the camera feed (VQ2), where temporal context matters a\
+   lot for tracking gates across frames. Not for the state-based phase.\
+\
+  My recommendation: Add history stacking now (quick), keep LSTM as an extension for the vision phase.\
+\
+  ---\
+  Big picture: what the competition context changes\
+                                                                                                                   \
+  Reading the AI Grand Prix emails, there are two things that significantly affect priorities:\
+                                                                                                                   \
+  1. The control interface is RPYT, not RPMs. This is actually fine \'97 our architecture is policy \uc0\u8594  waypoint delta \u8594 \
+   DSLPIDControl \uc0\u8594  RPMs, and the inner-loop can be swapped to output RPYT commands instead. The policy itself      \
+  doesn't change.                                                                                                  \
+                                                            \
+  2. VQ1 opens in May \'97 5 weeks away. The competition provides a camera feed, not ground truth gate positions. For \
+  VQ1 the gates are highlighted with high SNR (visual guidance aids active), so gate detection can be simple. But\
+  you need some gate detection to replace the ground truth relative gate positions in the observation.             \
+                                                            \
+  Team Northlake Labs (the blog post) is taking the same gym-pybullet-drones approach and has already hit Phase 0: \
+  100% single-gate at 14.85 m/s. Their key architectural insight worth stealing: velocity alignment reward (dot\
+  product of velocity toward gate) instead of Euclidean distance. This prevents the oscillate-near-gate reward hack\
+   and directly aligns incentives.                          \
+\
+  ---\
+  What to do next \'97 prioritized\
+                               \
+  For the course project (immediate):\
+                                                                                                                   \
+  1. History stacking \'97 change obs_dim to 12 * K (K=3), keep a rolling buffer in the env. This directly addresses  \
+  the critique's biggest complaint about architecture.                                                             \
+  2. Better progress reward \'97 replace \uc0\u8722 0.01 * ||pos - gate_center|| with the Northlake insight: reward based on    \
+  velocity projection along gate approach direction. Prevents the oscillation hack, gives cleaner gradient.        \
+  3. Clip radius curriculum schedule \'97 the critique calls this out explicitly. Add a concrete ramp tied to\
+  gates_passed or training step to env.clip_radius. Right now it's static.                                         \
+  4. Smoothness penalty \'97 add \uc0\u8722 \u955  * ||a_t \u8722  a_\{t\u8722 1\}|| to the reward (need to store last action in env).\
+  5. Eval harness \'97 the existing eval/evaluate.py is fine but we need per-checkpoint tables: completion rate,      \
+  time-to-finish, crash rate, max speed.                                                                           \
+                                                                                                                   \
+  For the competition (VQ1, May):                                                                                  \
+                                                            \
+  1. Modular env adapter \'97 wrap GateRaceAviary behind an abstract interface so swapping to the DCL platform is a   \
+  one-file change. Northlake did this and it's the right call.\
+  2. Simple gate detector for VQ1 \'97 since VQ1 has high SNR gates (highlighted, desaturated env), a simple approach \
+  works: detect the highlighted color region in the camera feed, fit an ellipse/rectangle, compute bearing + rough \
+  distance using known gate geometry. Feed that as relative gate position to the existing policy.\
+  3. RPYT control adapter \'97 when DCL publishes their API, wrap our inner-loop PID to output RPYT instead of RPMs.  \
+                                                                                                                   \
+  ---\
+  Which of these do you want to tackle first? The history stacking + reward improvements are the highest-value code\
+   changes for the course project right now, and I can implement both quickly. The DCL adapter will depend on them \
+  releasing the platform docs.}

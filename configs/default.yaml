@@ -1,0 +1,65 @@
+env:
+  ctrl_freq: 20
+  pyb_freq: 240
+  clip_radius_start: 0.25
+  clip_radius_end: 1.0
+  max_dyaw: 0.3
+  episode_len_sec: 30.0
+  history_len: 3           # stack this many observations → obs_dim = 12 * 3 = 36
+  smooth_coef: 0.01        # action jerk penalty coefficient
+  progress_coef: 0.1       # velocity-alignment reward coefficient
+  # Rectangular CCW circuit, gates at midpoints of sides
+  gates:
+    - center: [2.5, 0.0, 1.5]
+      normal: [1.0, 0.0, 0.0]
+      radius: 0.75
+    - center: [5.0, 2.5, 1.5]
+      normal: [0.0, 1.0, 0.0]
+      radius: 0.75
+    - center: [2.5, 5.0, 1.5]
+      normal: [-1.0, 0.0, 0.0]
+      radius: 0.75
+    - center: [0.0, 2.5, 1.5]
+      normal: [0.0, -1.0, 0.0]
+      radius: 0.75
+
+policy:
+  obs_dim: 36        # 12 * history_len
+  action_dim: 4
+  hidden: [256, 256]
+
+bc:
+  n_expert_episodes: 50
+  n_epochs: 200
+  lr: 3.0e-4
+  batch_size: 256
+
+dagger:
+  n_rounds: 10
+  n_rollout_episodes: 10
+  n_epochs: 50
+  lr: 3.0e-4
+  batch_size: 256
+
+ppo:
+  n_steps: 2048
+  n_epochs: 10
+  batch_size: 64
+  lr: 1.0e-4
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.001
+  vf_coef: 0.5
+  bc_coef: 0.25
+  max_grad_norm: 0.5
+  init_log_std: -2.0
+  target_kl: 0.03
+  min_updates_before_clip_relax: 5
+  total_timesteps: 500000
+  # Clip radius curriculum: list of [step_threshold, clip_radius] pairs.
+  # Applied at the start of each PPO update batch.
+  clip_schedule:
+    - [0,      0.25]
+    - [100000, 0.5]
+    - [300000, 1.0]
