@@ -14,7 +14,7 @@ import yaml
 
 from env.gate_race_aviary import make_env
 from eval.evaluate import evaluate
-from policy.actor import ActorCritic
+from policy.actor import build_actor_critic, policy_uses_images
 
 
 def _checkpoint_sort_key(path: Path) -> tuple[int, str]:
@@ -47,15 +47,19 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     env = make_env(cfg["env"])
     policy_cfg = cfg["policy"]
+    if policy_uses_images(policy_cfg):
+        cfg_image_shape = tuple(int(v) for v in policy_cfg.get("image_shape", []))
+        env_image_shape = tuple(int(v) for v in getattr(env, "policy_image_shape", ()))
+        if cfg_image_shape != env_image_shape:
+            raise ValueError(
+                f"policy.image_shape={cfg_image_shape} does not match env image shape {env_image_shape}"
+            )
 
     rows = []
     for ckpt in checkpoints:
-        actor = ActorCritic(
-            obs_dim=policy_cfg["obs_dim"],
-            action_dim=policy_cfg["action_dim"],
-            hidden=policy_cfg["hidden"],
-            init_log_std=float(cfg["ppo"].get("init_log_std", -2.0)),
-        )
+        build_cfg = dict(policy_cfg)
+        build_cfg["init_log_std"] = float(cfg["ppo"].get("init_log_std", -2.0))
+        actor = build_actor_critic(build_cfg)
         actor.load(str(ckpt), device=device).to(device).eval()
         stats = evaluate(
             env,

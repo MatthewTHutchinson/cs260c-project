@@ -56,13 +56,142 @@ Expert outputs same action space as learner (body-frame delta).
   broader track diversity plus randomized starts improved robustness on hard unseen tracks, but there is now a measurable specialization tradeoff between the easier and harder validation suites.
 - PPO now supports `validation_suites` in config, which allows multiple named validation environments with weighted aggregate checkpoint selection.
 - `configs/generalization_balanced.yaml` uses that feature to score checkpoints equally on an easier held-out suite and the harder randomized-start suite.
-- A new run is in progress at `logs/ppo_generalization_balanced_v1`.
-  Early mixed-validation checkpoints are healthy, with the best-so-far at step `51,200` reaching mixed completion `95%` and mixed mean return `67.64`.
+- `logs/ppo_generalization_balanced_v1/policy_ppo_best.pt` became the best easier-suite specialist so far:
+  aggregate return `75.15` on `configs/multitrack_ppo.yaml`, but only `97%` completion on the harder suite because `heldout_zigzag` dropped to `85%` completion.
+- Added four zigzag-style training layouts:
+  `train_zigzag_a`, `train_zigzag_b`, `train_switchback`, and `train_zigzag_lowhigh`.
+- Added `configs/generalization_balanced_v2.yaml`, which:
+  upweights zigzag-like training tracks via repeated sampling
+  and uses three validation suites: `easy`, `hard_core`, and `hard_zigzag`.
+- `logs/ppo_generalization_balanced_v2/policy_ppo_best.pt` is now the strongest easier-suite checkpoint so far:
+  aggregate return `75.38` on `configs/multitrack_ppo.yaml`.
+  It also restored `heldout_zigzag` to `100%` completion on the harder suite, but its harder-suite aggregate return is still `70.93`, below `ppo_generalization_v1` at `71.68`.
+- Zigzag-enriched BC and DAgger reruns were completed into:
+  `logs/bc_generalization_balanced_v2` and `logs/dagger_generalization_balanced_v2`.
+  Those imitation checkpoints did not outperform the earlier generalization imitation baselines on the harder held-out suite.
+- A final PPO comparison run is in progress at:
+  `logs/ppo_generalization_balanced_v3_from_dagger`
+  using `configs/generalization_balanced_v2.yaml` but warm-starting from `logs/dagger_generalization_balanced_v2/policy_dagger.pt`.
+- Early validation on that final PPO test has been stable but not obviously stronger than `ppo_generalization_balanced_v2`.
+  The first checkpoint reached mixed return `70.03`, but later early checkpoints softened and by step `40,960` mixed completion had fallen to `69%`.
+- Current interpretation:
+  track weighting helped PPO fix the zigzag-specific failure mode, but the expert policy and/or observation design is now a more likely bottleneck than raw imitation sample count.
+- A richer-observation branch is now implemented in `env/gate_race_aviary.py`:
+  `lookahead_gates`, `include_gate_normals`, and `include_relative_heading` are configurable per env config.
+- `configs/generalization_obs_v1.yaml` is the new richer-state training config.
+  It uses:
+  lookahead `3`, gate normals enabled, and explicit heading-alignment features.
+  Resulting obs dim is `78` (`26` per frame x `3` stacked frames).
+- `expert/expert_policy.py` now uses multi-gate lookahead and gate-normal-aware pass-through targeting instead of just chasing the next gate center.
+- Training/eval entrypoints now validate that `policy.obs_dim` matches the env observation size, which should prevent silent shape mismatches on future observation changes.
+- `eval.evaluate_track_suite` now understands `validation_suites` configs, not just `validation_env`.
+- The full `generalization_obs_v1` pipeline was trained successfully.
+  Current best checkpoint:
+  `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`
+  Hard-suite aggregate: completion `99%`, return `82.49`
+  Easy-suite aggregate: completion `100%`, return `82.95`
+- The richer-observation BC and DAgger baselines also improved substantially:
+  `logs/bc_generalization_obs_v1/policy_bc.pt` -> hard return `72.25`
+  `logs/dagger_generalization_obs_v1/policy_dagger.pt` -> hard return `72.95`
+- This is currently the clearest project conclusion:
+  richer observations and a better expert delivered a larger gain than additional track-resampling and curriculum tuning by themselves.
+- Added first-pass robustness audit support:
+  `eval/robustness_audit.py`, `configs/robustness_obs_v1.yaml`,
+  policy-input observation noise and action noise support in `eval.evaluate`,
+  optional disturbance impulses in `GateRaceAviary`,
+  and new OOD audit tracks in `env/tracks.py`.
+- Audit results for `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`:
+  `nominal_easy` completion `100.0%`
+  `nominal_hard_core` completion `99.2%`
+  `nominal_hard_zigzag` completion `98.3%`
+  `stress_start_pose` completion `98.3%`
+  `stress_action_noise` completion `98.3%`
+  `ood_vertical` completion `76.7%`
+  `ood_switchback` completion `25.0%`
+  `stress_disturbance` completion `0.0%`
+- Current interpretation:
+  the richer-observation champion is strong on the known held-out distribution and mild noise sweeps, but the next real robustness gap is OOD geometry, especially sharp switchbacks and vertical drop/recover layouts.
+- Added a new robustness-focused training config:
+  `configs/generalization_robust_obs_v1.yaml`
+  It keeps the richer `78`-D observation branch but expands the training distribution with:
+  `train_vertical_arc_a`, `train_vertical_arc_b`,
+  `train_drop_recover_a`, `train_drop_recover_b`,
+  `train_switchback_tight_a`, `train_switchback_tight_b`,
+  and `train_offset_recover`.
+- PPO validation in that config now scores five suites:
+  `easy`, `hard_core`, `hard_zigzag`, `ood_vertical`, and `ood_switchback`.
+- A quick expert sanity check confirmed completion on representative new training-style tracks after softening `train_offset_recover`.
+- The full pipeline is now running via:
+  `KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python train_all.py --config configs/generalization_robust_obs_v1.yaml --bc-out logs/bc_generalization_robust_obs_v1 --dagger-out logs/dagger_generalization_robust_obs_v1 --ppo-out logs/ppo_generalization_robust_obs_v1`
+- That run finished.
+  BC collected `60,100` transitions.
+  DAgger reached `161,068` transitions.
+  PPO best checkpoint:
+  `logs/ppo_generalization_robust_obs_v1/policy_ppo_best.pt`
+- Robustness audit result for that checkpoint:
+  `ood_switchback` improved massively from completion `25.0%` to `90.8%`.
+  `ood_vertical` improved only slightly from `76.7%` to `79.2%`.
+  `stress_disturbance` remained `0%` completion.
+- Standard held-out tradeoff:
+  this robustness-focused branch is slower and lower-return than `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`
+  on the standard held-out suites, even though completion became cleaner.
+- Current interpretation:
+  there are now effectively two useful PPO champions:
+  `ppo_generalization_obs_v1` for stronger nominal/easier performance,
+  and `ppo_generalization_robust_obs_v1` for switchback OOD robustness.
+  The next robustness branch should focus on `audit_drop_recover` while rebalancing validation so nominal speed does not regress as much.
+- That next branch is now `configs/generalization_robust_obs_v2.yaml`.
+  Main changes:
+  more drop/recover and vertical-ladder style training tracks,
+  separate validation suites for `ood_vertical_ladder` and `ood_drop_recover`,
+  and reduced `ood_switchback` validation weight.
+- Quick expert sanity checks were run before training,
+  and the expert completed the representative hard training-style tracks after softening `train_drop_recover_b` and `train_drop_recover_d`.
+- Active run:
+  `KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python train_all.py --config configs/generalization_robust_obs_v2.yaml --bc-out logs/bc_generalization_robust_obs_v2 --dagger-out logs/dagger_generalization_robust_obs_v2 --ppo-out logs/ppo_generalization_robust_obs_v2`
+- `generalization_robust_obs_v2` is now complete and should be treated as a negative result for balanced performance.
+  It solved `audit_drop_recover`:
+  completion reached `100%` in the audit.
+  But it lost the switchback gains from `robust_obs_v1`:
+  `ood_switchback` fell back to `24.2%` completion.
+  It also further regressed nominal held-out return and finish time.
+- PPO metrics confirm this was not just a bad final checkpoint:
+  the best validation snapshot still had `val_ood_switchback_mean_return` only about `39.7`.
+- Current interpretation:
+  reweighting the single-policy training distribution has likely hit diminishing returns.
+  The next meaningful branch should be something structurally different:
+  specialized policies, curriculum scheduling, conditional control, or perception/architecture changes.
+- That perception branch is now implemented:
+  `GateRaceAviary` supports onboard RGB rendering, visible gates/floor/walls/clutter, and visual randomization.
+  `observation_source="vision_bridge"` reconstructs gate-relative observations from the onboard camera via `GateDetector`.
+  This is intentionally a hybrid bridge: dynamics are still from state, while gate positions come from perception.
+- Added multimodal state+vision policies in `policy/actor.py`
+  plus shared routing helpers in `policy/runtime.py`.
+  BC, DAgger, PPO, and the eval scripts now support either state-only or multimodal policies from config.
+- New configs:
+  `configs/vision_bridge_eval_v1.yaml`
+  for testing existing MLP checkpoints through perception,
+  and `configs/multimodal_obs_v1.yaml`
+  for the first full state+vision training branch.
+- Smoke tests completed:
+  detector-backed env reset/step worked,
+  multimodal BC forward/training worked,
+  and a tiny multimodal PPO rollout/update smoke worked.
+  One bug was fixed during this pass:
+  image datasets now normalize to `CHW` consistently across BC, DAgger, and PPO.
+- On this machine, some training/eval runs may need:
+  `KMP_DUPLICATE_LIB_OK=TRUE`
+  to work around a duplicate OpenMP runtime issue in the Conda env.
 
 ## Notes for future Claude sessions
 - If BC works but PPO regresses immediately, inspect PPO rollout crash rate and mean gates before assuming the reward is wrong.
 - The current expert implementation is still a simple gate-chasing heuristic in code, even though earlier planning notes mention spline/min-snap.
 - Use the Conda interpreter at `/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python` if the shell `python3` is missing project dependencies.
 - Documentation workflow now lives in `README.md` plus:
-  `docs/PROGRESS.md`, `docs/REPORT_NOTES.md`, and `docs/PORTFOLIO_NOTES.md`.
-- After `ppo_generalization_balanced_v1` finishes, compare its best checkpoint on both `configs/multitrack_ppo.yaml` and `configs/generalization_hard.yaml` before promoting it.
+  `docs/PROGRESS.md`, `docs/REPORT_NOTES.md`, `docs/PORTFOLIO_NOTES.md`, and `docs/BRAINSTORMING.md`.
+- After the zigzag-enriched imitation reruns, decide whether to spend another PPO run on the new DAgger checkpoint or move next to richer observations / stronger expert logic.
+- The next major training branch after the current PPO comparison should be `generalization_obs_v1`.
+- `generalization_obs_v1` is now the main champion branch to build on.
+- Before the next speed-optimization push, use `logs/robustness_obs_v1/report.md` and `per_track.csv` to target new robustness work at `heldout_lowhigh`, `audit_drop_recover`, `audit_sharp_switchback`, and `audit_offset_spike`.
+- The immediate active follow-up run after the first robustness audit is `generalization_robust_obs_v1`.
+- That follow-up run is complete; the next most likely branch is a drop/recover-focused robustness v2.

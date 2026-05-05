@@ -10,14 +10,17 @@ The current training flow is:
 
 ## Current best checkpoints
 
-- Best easier-suite specialist:
-  `logs/ppo_multitrack_v1/policy_ppo_best.pt`
-  with held-out return `70.33` on `configs/multitrack_ppo.yaml`
-- Best harder-suite generalization model:
-  `logs/ppo_generalization_v1/policy_ppo_best.pt`
-  with held-out return `71.68` on `configs/generalization_hard.yaml`
+- Best overall current model:
+  `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`
+  with richer-observation hard-suite return `82.49`
+  and richer-observation easy-suite return `82.95`
 
-If you want the strongest all-around current model, start with `logs/ppo_generalization_v1/policy_ppo_best.pt`.
+- New vision branch status:
+  onboard RGB rendering, detector-backed `vision_bridge` observations,
+  scene visual randomization, and multimodal state+vision training are now implemented.
+  The first multimodal config is `configs/multimodal_obs_v1.yaml`.
+
+If you want the strongest current model, start with `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`.
 
 ## Project map
 
@@ -124,6 +127,91 @@ KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-projec
   --out logs/ppo_generalization_balanced_v1
 ```
 
+Run the zigzag-focused balanced PPO follow-up:
+
+```bash
+KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m training.ppo \
+  --config configs/generalization_balanced_v2.yaml \
+  --dagger-ckpt logs/dagger_generalization_v1/policy_dagger.pt \
+  --dagger-data logs/dagger_generalization_v1 \
+  --out logs/ppo_generalization_balanced_v2
+```
+
+Train the richer-observation / stronger-expert branch:
+
+```bash
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python train_all.py \
+  --config configs/generalization_obs_v1.yaml \
+  --bc-out logs/bc_generalization_obs_v1 \
+  --dagger-out logs/dagger_generalization_obs_v1 \
+  --ppo-out logs/ppo_generalization_obs_v1
+```
+
+Train the robustness-focused richer-observation branch:
+
+```bash
+KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python train_all.py \
+  --config configs/generalization_robust_obs_v1.yaml \
+  --bc-out logs/bc_generalization_robust_obs_v1 \
+  --dagger-out logs/dagger_generalization_robust_obs_v1 \
+  --ppo-out logs/ppo_generalization_robust_obs_v1
+```
+
+Train the drop/recover-focused robustness follow-up:
+
+```bash
+KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python train_all.py \
+  --config configs/generalization_robust_obs_v2.yaml \
+  --bc-out logs/bc_generalization_robust_obs_v2 \
+  --dagger-out logs/dagger_generalization_robust_obs_v2 \
+  --ppo-out logs/ppo_generalization_robust_obs_v2
+```
+
+Run the robustness audit on the current richer-observation champion:
+
+```bash
+KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.robustness_audit \
+  --config configs/robustness_obs_v1.yaml \
+  --type ppo \
+  --ckpt logs/ppo_generalization_obs_v1/policy_ppo_best.pt \
+  --out logs/robustness_obs_v1
+```
+
+That audit writes:
+
+- `logs/robustness_obs_v1/report.md`
+- `logs/robustness_obs_v1/per_track.csv`
+- `logs/robustness_obs_v1/summary.json`
+
+Evaluate an existing state policy through the detector-backed perception bridge:
+
+```bash
+KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.evaluate \
+  --config configs/vision_bridge_eval_v1.yaml \
+  --type ppo \
+  --ckpt logs/ppo_generalization_obs_v1/policy_ppo_best.pt \
+  --episodes 10
+```
+
+Visualize the same bridge path in PyBullet:
+
+```bash
+KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.visualize \
+  --config configs/vision_bridge_eval_v1.yaml \
+  --type ppo \
+  --ckpt logs/ppo_generalization_obs_v1/policy_ppo_best.pt
+```
+
+Train the first multimodal state+vision branch:
+
+```bash
+KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python train_all.py \
+  --config configs/multimodal_obs_v1.yaml \
+  --bc-out logs/bc_multimodal_obs_v1 \
+  --dagger-out logs/dagger_multimodal_obs_v1 \
+  --ppo-out logs/ppo_multimodal_obs_v1
+```
+
 ## Documentation workflow
 
 Use these files as the shared documentation backbone:
@@ -131,6 +219,7 @@ Use these files as the shared documentation backbone:
 - `docs/PROGRESS.md`: chronological experiment log and current status
 - `docs/REPORT_NOTES.md`: class report outline, claims, and evidence
 - `docs/PORTFOLIO_NOTES.md`: public-facing project story and visuals checklist
+- `docs/BRAINSTORMING.md`: roadmap, limitations, and future observation / vision plans
 
 The intended workflow is simple:
 

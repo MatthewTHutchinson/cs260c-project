@@ -91,6 +91,90 @@ TRACK_LIBRARY: dict[str, list[dict]] = {
         [2.9, 5.8, 1.7],
         [-0.6, 2.8, 1.4],
     ], radius=0.78),
+    "train_zigzag_a": track_from_centers([
+        [2.1, 0.2, 1.3],
+        [5.4, 1.9, 1.9],
+        [1.7, 5.1, 1.5],
+        [-0.7, 2.4, 1.8],
+    ], radius=0.68),
+    "train_zigzag_b": track_from_centers([
+        [2.4, 0.7, 1.2],
+        [5.1, 2.0, 1.8],
+        [1.8, 4.7, 1.3],
+        [-0.2, 2.8, 1.9],
+    ], radius=0.64),
+    "train_switchback": track_from_centers([
+        [1.8, 0.1, 1.4],
+        [5.7, 1.7, 1.7],
+        [1.4, 5.6, 1.6],
+        [-1.0, 2.9, 1.5],
+    ], radius=0.67),
+    "train_zigzag_lowhigh": track_from_centers([
+        [2.0, 0.3, 1.0],
+        [5.5, 2.1, 2.0],
+        [1.9, 5.0, 1.2],
+        [-0.6, 2.4, 1.9],
+    ], radius=0.65),
+    "train_vertical_arc_a": track_from_centers([
+        [2.1, -0.3, 1.0],
+        [5.3, 2.0, 2.3],
+        [2.5, 5.2, 0.9],
+        [-0.5, 2.6, 2.1],
+    ], radius=0.63),
+    "train_vertical_arc_b": track_from_centers([
+        [2.5, 0.1, 0.9],
+        [5.7, 2.4, 2.2],
+        [2.2, 5.5, 1.0],
+        [-0.8, 2.9, 2.0],
+    ], radius=0.62),
+    "train_drop_recover_a": track_from_centers([
+        [2.2, -0.5, 1.8],
+        [5.4, 1.9, 0.9],
+        [2.8, 5.4, 2.1],
+        [-0.7, 2.7, 1.1],
+    ], radius=0.61),
+    "train_drop_recover_b": track_from_centers([
+        [2.6, -0.1, 1.9],
+        [5.6, 2.1, 0.9],
+        [2.5, 5.5, 2.1],
+        [-0.8, 2.4, 1.1],
+    ], radius=0.63),
+    "train_drop_recover_c": track_from_centers([
+        [2.4, -0.6, 1.9],
+        [5.5, 2.2, 0.9],
+        [2.7, 5.5, 2.2],
+        [-0.9, 2.7, 1.0],
+    ], radius=0.60),
+    "train_drop_recover_d": track_from_centers([
+        [2.5, -0.1, 1.9],
+        [5.6, 2.2, 1.0],
+        [2.6, 5.5, 2.1],
+        [-0.8, 2.5, 1.1],
+    ], radius=0.64),
+    "train_vertical_ladder_train": track_from_centers([
+        [2.1, -0.2, 0.8],
+        [5.1, 2.2, 2.5],
+        [2.5, 5.1, 0.9],
+        [-0.6, 2.5, 2.4],
+    ], radius=0.61),
+    "train_switchback_tight_a": track_from_centers([
+        [1.9, 0.5, 1.2],
+        [5.6, 1.6, 1.9],
+        [1.5, 5.5, 1.1],
+        [-1.0, 2.5, 2.0],
+    ], radius=0.61),
+    "train_switchback_tight_b": track_from_centers([
+        [2.3, 0.8, 1.0],
+        [5.9, 1.8, 2.1],
+        [1.6, 5.9, 1.0],
+        [-1.2, 2.2, 2.2],
+    ], radius=0.59),
+    "train_offset_recover": track_from_centers([
+        [2.8, -0.5, 1.2],
+        [5.6, 2.5, 1.9],
+        [2.2, 5.2, 1.1],
+        [-0.8, 2.2, 1.9],
+    ], radius=0.62),
     "heldout_diamond": track_from_centers([
         [2.4, -0.2, 1.5],
         [5.0, 2.0, 1.8],
@@ -121,6 +205,30 @@ TRACK_LIBRARY: dict[str, list[dict]] = {
         [2.5, 5.1, 1.2],
         [-0.4, 2.7, 1.9],
     ], radius=0.65),
+    "audit_vertical_ladder": track_from_centers([
+        [2.2, -0.1, 0.9],
+        [5.0, 2.3, 2.4],
+        [2.4, 5.0, 0.8],
+        [-0.5, 2.5, 2.3],
+    ], radius=0.60),
+    "audit_sharp_switchback": track_from_centers([
+        [1.8, 0.6, 1.1],
+        [5.8, 1.5, 2.0],
+        [1.3, 5.8, 1.0],
+        [-1.1, 2.4, 2.1],
+    ], radius=0.60),
+    "audit_drop_recover": track_from_centers([
+        [2.4, -0.4, 1.9],
+        [5.6, 2.1, 0.8],
+        [2.6, 5.6, 2.2],
+        [-0.8, 2.6, 1.0],
+    ], radius=0.61),
+    "audit_offset_spike": track_from_centers([
+        [2.9, -0.6, 1.0],
+        [5.9, 2.8, 2.1],
+        [1.9, 5.7, 1.1],
+        [-1.2, 2.1, 2.0],
+    ], radius=0.58),
 }
 
 

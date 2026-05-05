@@ -18,7 +18,8 @@ import yaml
 
 from env.gate_race_aviary import make_env
 from expert.expert_policy import ExpertPolicy
-from policy.actor import DronePolicy, ActorCritic
+from policy.actor import build_actor_critic, build_deterministic_policy, policy_uses_images
+from policy.runtime import get_env_image, image_batch_to_tensor, obs_batch_to_tensor, policy_act
 
 
 def evaluate(
@@ -30,11 +31,13 @@ def evaluate(
     realtime: bool = False,
     episode_delay: float = 0.0,
     print_stats: bool = True,
+    obs_noise_std: float = 0.0,
+    action_noise_std: float = 0.0,
 ) -> dict:
     """Roll out actor for n_episodes and return an aggregated stats dict."""
     n_gates_total = getattr(env, "n_gates_total", env.n_gates)
     control_dt = 1.0 / float(getattr(env, "CTRL_FREQ", 20))
-    single_obs_dim = 12
+    rng = np.random.default_rng(seed + 1009)
 
     returns, lengths, gates_list = [], [], []
     completions, crashes, oobs   = 0, 0, 0
@@ -56,9 +59,20 @@ def evaluate(
             if isinstance(actor, ExpertPolicy):
                 action = actor.act(env)
             else:
-                obs_t  = torch.from_numpy(obs).unsqueeze(0).to(device)
+                policy_obs = obs
+                if obs_noise_std > 0.0:
+                    policy_obs = (
+                        obs + rng.normal(0.0, obs_noise_std, size=obs.shape).astype(np.float32)
+                    )
+                obs_t = obs_batch_to_tensor(policy_obs, device)
+                img_t = None
+                if getattr(actor, "expects_image", False):
+                    img_t = image_batch_to_tensor(get_env_image(env), device)
                 with torch.no_grad():
-                    action = actor.act(obs_t, deterministic=True).squeeze(0).cpu().numpy()
+                    action = policy_act(actor, obs_t, img_t, deterministic=True).squeeze(0).cpu().numpy()
+            if action_noise_std > 0.0:
+                action = action + rng.normal(0.0, action_noise_std, size=action.shape).astype(np.float32)
+                action = np.clip(action, -1.0, 1.0)
 
             obs, reward, terminated, truncated, info = env.step(action)
             ep_return    += float(reward)
@@ -71,9 +85,15 @@ def evaluate(
             if lap_finish_step is None and gates >= n_gates_total:
                 lap_finish_step = ep_len
 
-            # Use the newest stacked frame for speed.
-            vel_body_norm = float(np.linalg.norm(obs[-single_obs_dim : -single_obs_dim + 3]))
-            ep_max_speed  = max(ep_max_speed, vel_body_norm)
+            # Measure true speed from the simulator state so observation noise
+            # does not contaminate robustness metrics.
+            if hasattr(env, "get_full_state"):
+                vel_world = env.get_full_state()["vel"]
+                ep_max_speed = max(ep_max_speed, float(np.linalg.norm(vel_world)))
+            else:
+                single_obs_dim = int(getattr(env, "single_obs_dim", 12))
+                newest_frame = obs[-single_obs_dim:]
+                ep_max_speed = max(ep_max_speed, float(np.linalg.norm(newest_frame[:3])))
 
             if realtime:
                 time.sleep(control_dt)
@@ -140,6 +160,10 @@ def main(argv=None):
     parser.add_argument("--episode-delay", type=float, default=1.0,
                         help="Seconds to pause between episodes when visualizing.")
     parser.add_argument("--seed",     type=int,  default=0)
+    parser.add_argument("--obs-noise-std", type=float, default=0.0,
+                        help="Gaussian std added to policy inputs only during evaluation.")
+    parser.add_argument("--action-noise-std", type=float, default=0.0,
+                        help="Gaussian std added to actions before env.step during evaluation.")
     args = parser.parse_args(argv)
 
     with open(args.config) as f:
@@ -148,20 +172,27 @@ def main(argv=None):
     device     = "cuda" if torch.cuda.is_available() else "cpu"
     env        = make_env(cfg["env"], gui=args.gui, camera_follow=args.camera_follow)
     policy_cfg = cfg["policy"]
+    obs_dim    = int(env.observation_space.shape[0])
+    cfg_obs_dim = int(policy_cfg.get("obs_dim", obs_dim))
+    if cfg_obs_dim != obs_dim:
+        raise ValueError(f"policy.obs_dim={cfg_obs_dim} does not match env observation dim {obs_dim}")
+    if policy_uses_images(policy_cfg):
+        cfg_image_shape = tuple(int(v) for v in policy_cfg.get("image_shape", []))
+        env_image_shape = tuple(int(v) for v in getattr(env, "policy_image_shape", ()))
+        if cfg_image_shape != env_image_shape:
+            raise ValueError(
+                f"policy.image_shape={cfg_image_shape} does not match env image shape {env_image_shape}"
+            )
 
     if args.type == "expert":
         actor = ExpertPolicy()
-        print("[Eval] Actor: Expert (spline)")
+        print("[Eval] Actor: Expert (lookahead)")
     elif args.type == "bc":
-        actor = DronePolicy(obs_dim=policy_cfg["obs_dim"],
-                            action_dim=policy_cfg["action_dim"],
-                            hidden=policy_cfg["hidden"])
+        actor = build_deterministic_policy(policy_cfg, obs_dim=obs_dim)
         actor.load(args.ckpt, device=device).to(device).eval()
         print(f"[Eval] Actor: BC  ({args.ckpt})")
     elif args.type == "ppo":
-        actor = ActorCritic(obs_dim=policy_cfg["obs_dim"],
-                            action_dim=policy_cfg["action_dim"],
-                            hidden=policy_cfg["hidden"])
+        actor = build_actor_critic(policy_cfg)
         actor.load(args.ckpt, device=device).to(device).eval()
         print(f"[Eval] Actor: PPO ({args.ckpt})")
 
@@ -180,6 +211,8 @@ def main(argv=None):
         seed=args.seed,
         realtime=args.realtime,
         episode_delay=args.episode_delay if args.gui else 0.0,
+        obs_noise_std=args.obs_noise_std,
+        action_noise_std=args.action_noise_std,
     )
     env.close()
 

@@ -12,12 +12,16 @@ The project tackles a hard robotics problem: getting a drone to race through a s
 
 - Custom drone racing environment built on top of `gym-pybullet-drones`
 - Structured state representation in the drone body frame
+- Upgraded observation design with deeper gate lookahead and orientation-aware features
+- Onboard RGB camera rendering, gate visuals, and scene randomization inside the simulator
+- Detector-backed perception bridge and a first multimodal state+vision policy path
 - Action space designed around waypoint deltas instead of raw motor commands
 - Sequential BC -> DAgger -> PPO training pipeline
 - PPO stabilization work to keep RL from destroying a good imitation policy
 - Visualization tools for replaying policies inside the simulator
 - Multi-track training and held-out track evaluation to test generalization rather than only memorizing one course
 - Randomized-start and harder-track training to improve robustness on unseen layouts
+- Dedicated robustness audit covering start-state stress, noise sweeps, and out-of-distribution track geometry
 
 ## Good assets to gather
 
@@ -39,15 +43,29 @@ Focus on:
 
 ## Stronger proof points
 
-- Best harder-suite PPO checkpoint:
-  `logs/ppo_generalization_v1/policy_ppo_best.pt`
-- Harder held-out suite result:
-  `100%` completion, `0%` crash rate, aggregate mean return `71.68`
-- Same checkpoint on the earlier held-out suite:
-  `100%` completion, `0%` crash rate, aggregate mean return `69.57`
+- Best overall PPO checkpoint:
+  `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`
+- Richer-observation hard held-out suite result:
+  `99%` completion, `0%` crash rate, aggregate mean return `82.49`
+- Richer-observation easy held-out suite result:
+  `100%` completion, `0%` crash rate, aggregate mean return `82.95`
 - Good narrative:
-  the final system did not just memorize one rectangular course; it held up on harder unseen layouts and randomized starts.
+  the biggest jump came from improving what the policy observed and how the expert planned, not just from more training runs.
+- Honest nuance:
+  the same audit that showed strong held-out robustness also exposed sharp OOD switchbacks and vertical recovery layouts as the next major failure cases.
+- Active extension:
+  I have now implemented and started training a multimodal state+vision branch rather than only planning it on paper.
+- Current follow-up:
+  I started a targeted robustness branch that retrains the full pipeline on new vertical and switchback-inspired tracks rather than only tuning PPO on the old distribution.
+- Outcome of that branch:
+  it substantially fixed the sharp switchback OOD failures, but it also made the policy slower and slightly worse on the standard held-out tracks.
+  That tradeoff is a useful story point because it shows real distribution-shift engineering rather than only cherry-picking one metric.
+- Current follow-up:
+  I launched a second robustness pass that isolates the remaining drop/recover failure mode instead of continuing to over-weight switchbacks.
+- Outcome of that second pass:
+  it fixed the drop/recover OOD case, but it broke the switchback gains and hurt nominal performance.
+  That was a useful engineering lesson about the limits of simply reweighting training distributions for a single policy.
 
 ## One-sentence portfolio summary
 
-Designed and trained a simulated autonomous drone racing agent using behavior cloning, DAgger, and PPO, with custom control abstractions, RL stabilization tooling, and held-out multitrack evaluation to improve robustness on unseen courses.
+Designed and trained a simulated autonomous drone racing agent using behavior cloning, DAgger, and PPO, then substantially improved it through better geometric observations, stronger expert planning, and a new state+vision perception branch rather than only tuning training distribution.

@@ -18,7 +18,7 @@ A staged imitation-to-RL pipeline is a practical way to bootstrap autonomous dro
 ## Key implementation details to explain
 
 - Observation:
-  body-frame velocity, angular rates, and next-two-gate relative positions
+  body-frame velocity, angular rates, and relative gate geometry in the body frame
 - Action:
   body-frame waypoint delta plus yaw delta
 - Environment:
@@ -27,6 +27,8 @@ A staged imitation-to-RL pipeline is a practical way to bootstrap autonomous dro
   sparse gate reward, crash penalty, velocity-alignment shaping, jerk penalty
 - Curriculum:
   clip radius increases during PPO
+- Perception branch:
+  onboard RGB rendering, detector-backed gate estimation, and a first multimodal state+vision policy path
 
 ## Evidence to collect
 
@@ -60,11 +62,66 @@ A staged imitation-to-RL pipeline is a practical way to bootstrap autonomous dro
 - This gives a useful report narrative:
   broader training distributions and randomized starts improved robustness to harder unseen tracks, while slightly reducing specialization on the easier validation distribution.
 - Mixed validation is now implemented in PPO, so the next report-quality comparison can ask whether multi-objective checkpoint selection reduces that tradeoff.
+- A richer-observation branch is now implemented:
+  the next policy can observe three gates ahead, gate-normal orientation features, and explicit heading alignment to the next gate plane.
+- The expert has also been upgraded from a simple gate-center chase to a multi-gate lookahead targeter.
+- This creates a clean report narrative transition from distribution tuning to representation design.
+- That richer-observation branch produced the strongest result in the project so far:
+  `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`.
+- On the richer-observation hard held-out suite, PPO reached aggregate completion `99%` and mean return `82.49`.
+- On the richer-observation easy held-out suite, PPO reached aggregate completion `100%` and mean return `82.95`.
+- The upgraded imitation baselines improved too:
+  richer-observation BC reached hard-suite return `72.25`, and richer-observation DAgger reached `72.95`.
+- This is a strong argument that representation design and a better expert mattered more than additional track-resampling alone.
+- A dedicated robustness audit was added and run on the richer-observation champion:
+  `eval/robustness_audit.py` with outputs in `logs/robustness_obs_v1/`.
+- On that audit, the current best PPO remained strong on the known distribution:
+  `100.0%` completion on `nominal_easy`,
+  `99.2%` on `nominal_hard_core`,
+  and `98.3%` on `nominal_hard_zigzag`.
+- The audit also exposed the next honest limitation:
+  performance drops sharply on harder OOD layouts, especially `ood_vertical` (`76.7%` completion) and `ood_switchback` (`25.0%` completion).
+- Mild observation noise and moderate action noise did not materially degrade performance in this first audit, so the bigger remaining weakness appears to be geometric OOD generalization rather than small Gaussian sensor noise.
+- A follow-up robustness-focused training branch is now running:
+  `configs/generalization_robust_obs_v1.yaml`
+  -> `logs/ppo_generalization_robust_obs_v1`.
+- That branch expanded the training distribution with vertical-recovery and switchback-style tracks that resemble the audit failures without reusing the exact held-out OOD layouts.
+- It also changed PPO checkpoint selection to score five suites, including explicit `ood_vertical` and `ood_switchback` validation sets.
+- The result was a clear win on the switchback OOD family:
+  audit `ood_switchback` improved from completion `25.0%` / return `33.59`
+  to completion `90.8%` / return `69.18`.
+- But the same branch slightly worsened most standard held-out returns and finish times,
+  and only marginally improved the vertical OOD aggregate because `audit_drop_recover` remained difficult.
+- This is a strong report-quality example of a distribution-shift tradeoff:
+  targeted robustness training can solve one OOD family while still over-specializing and sacrificing nominal speed.
+- A follow-up `generalization_robust_obs_v2` branch is now running to test a more surgical intervention:
+  separate validation for `audit_drop_recover`,
+  more drop/recover-inspired training tracks,
+  and reduced switchback validation weight so nominal-track performance is better protected.
+- That `robust_obs_v2` branch produced an important negative result:
+  it fully solved `audit_drop_recover` in the audit,
+  but `ood_switchback` collapsed back down to roughly the weak `obs_v1` regime.
+- This is good report material because it shows that even fairly sophisticated distribution reweighting hit a limit:
+  one-policy track-distribution tuning alone was not enough to simultaneously optimize nominal speed,
+  switchback OOD robustness, and drop/recover OOD robustness.
+- A new perception branch is now implemented in code:
+  the simulator can render onboard RGB frames, randomize the scene visually,
+  and reconstruct approximate gate-relative observations through `GateDetector`.
+- A first multimodal training run is also now underway:
+  `configs/multimodal_obs_v1.yaml`
+  -> `logs/ppo_multimodal_obs_v1`.
+  BC already completed and DAgger is in progress.
+- This gives the report a strong “future work became implementation” arc:
+  the project no longer only discusses vision as a next idea;
+  it now has an actual bridge and multimodal training path, even though the best completed results are still from the richer state-based PPO branch.
 
 ## Limitations to mention honestly
 
 - current expert is a heuristic gate chaser, not a full minimum-snap planner
 - DCL adapter is still a stub and not yet competition-ready
-- training currently uses state observations, not end-to-end vision
+- best completed results currently still use structured state observations rather than end-to-end vision
 - PPO remains sensitive to exploration and reward design
 - validation choice now matters strategically, because the "best" checkpoint depends on whether the metric emphasizes easy-track speed or hard-track robustness
+- even the new best PPO checkpoint is still state-based and simulator-privileged, so its performance should not be conflated with real-world camera-only racing capability
+- the new robustness audit shows that strong results on held-out in-distribution tracks do not yet imply robustness to sharper OOD switchbacks, vertical drop/recover layouts, or external disturbances
+- even after targeted OOD retraining, vertical drop/recover layouts remain a meaningful failure mode

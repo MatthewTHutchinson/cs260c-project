@@ -1,0 +1,213 @@
+env:
+  ctrl_freq: 20
+  pyb_freq: 240
+  clip_radius_start: 0.25
+  clip_radius_end: 0.5
+  max_dyaw: 0.3
+  episode_len_sec: 30.0
+  history_len: 3
+  lookahead_gates: 3
+  include_gate_normals: true
+  include_relative_heading: true
+  smooth_coef: 0.01
+  progress_coef: 0.1
+  track_names:
+    - rect_default
+    - rect_narrow
+    - rect_wide
+    - rect_tall
+    - rect_skew
+    - rect_offset
+    - rect_drop
+    - rect_bow
+    - rect_fast
+    - train_zigzag_a
+    - train_zigzag_b
+    - train_switchback
+    - train_zigzag_lowhigh
+    - train_vertical_arc_a
+    - train_vertical_arc_b
+    - train_drop_recover_a
+    - train_drop_recover_b
+    - train_switchback_tight_a
+    - train_switchback_tight_b
+    - train_offset_recover
+    - train_zigzag_a
+    - train_switchback
+    - train_zigzag_lowhigh
+    - train_vertical_arc_a
+    - train_drop_recover_a
+    - train_switchback_tight_a
+    - train_offset_recover
+  sample_track_on_reset: true
+  start_distance: 3.0
+  start_longitudinal_jitter: 0.60
+  start_lateral_jitter: 0.70
+  start_vertical_jitter: 0.35
+  start_yaw_jitter: 0.55
+
+validation_suites:
+  - name: easy
+    weight: 0.15
+    env:
+      ctrl_freq: 20
+      pyb_freq: 240
+      clip_radius_start: 0.25
+      clip_radius_end: 0.5
+      max_dyaw: 0.3
+      episode_len_sec: 30.0
+      history_len: 3
+      lookahead_gates: 3
+      include_gate_normals: true
+      include_relative_heading: true
+      smooth_coef: 0.01
+      progress_coef: 0.1
+      track_names:
+        - heldout_diamond
+        - heldout_tilted
+      sample_track_on_reset: true
+      start_distance: 3.0
+      start_longitudinal_jitter: 0.45
+      start_lateral_jitter: 0.50
+      start_vertical_jitter: 0.25
+      start_yaw_jitter: 0.40
+  - name: hard_core
+    weight: 0.20
+    env:
+      ctrl_freq: 20
+      pyb_freq: 240
+      clip_radius_start: 0.25
+      clip_radius_end: 0.5
+      max_dyaw: 0.3
+      episode_len_sec: 30.0
+      history_len: 3
+      lookahead_gates: 3
+      include_gate_normals: true
+      include_relative_heading: true
+      smooth_coef: 0.01
+      progress_coef: 0.1
+      track_names:
+        - heldout_diamond
+        - heldout_tilted
+        - heldout_pinched
+        - heldout_lowhigh
+      sample_track_on_reset: true
+      start_distance: 3.0
+      start_longitudinal_jitter: 0.45
+      start_lateral_jitter: 0.50
+      start_vertical_jitter: 0.25
+      start_yaw_jitter: 0.40
+  - name: hard_zigzag
+    weight: 0.20
+    env:
+      ctrl_freq: 20
+      pyb_freq: 240
+      clip_radius_start: 0.25
+      clip_radius_end: 0.5
+      max_dyaw: 0.3
+      episode_len_sec: 30.0
+      history_len: 3
+      lookahead_gates: 3
+      include_gate_normals: true
+      include_relative_heading: true
+      smooth_coef: 0.01
+      progress_coef: 0.1
+      track_names:
+        - heldout_zigzag
+      sample_track_on_reset: true
+      start_distance: 3.0
+      start_longitudinal_jitter: 0.45
+      start_lateral_jitter: 0.55
+      start_vertical_jitter: 0.25
+      start_yaw_jitter: 0.45
+  - name: ood_vertical
+    weight: 0.225
+    env:
+      ctrl_freq: 20
+      pyb_freq: 240
+      clip_radius_start: 0.25
+      clip_radius_end: 0.5
+      max_dyaw: 0.3
+      episode_len_sec: 30.0
+      history_len: 3
+      lookahead_gates: 3
+      include_gate_normals: true
+      include_relative_heading: true
+      smooth_coef: 0.01
+      progress_coef: 0.1
+      track_names:
+        - audit_vertical_ladder
+        - audit_drop_recover
+      sample_track_on_reset: true
+      start_distance: 3.0
+      start_longitudinal_jitter: 0.60
+      start_lateral_jitter: 0.70
+      start_vertical_jitter: 0.40
+      start_yaw_jitter: 0.55
+  - name: ood_switchback
+    weight: 0.225
+    env:
+      ctrl_freq: 20
+      pyb_freq: 240
+      clip_radius_start: 0.25
+      clip_radius_end: 0.5
+      max_dyaw: 0.3
+      episode_len_sec: 30.0
+      history_len: 3
+      lookahead_gates: 3
+      include_gate_normals: true
+      include_relative_heading: true
+      smooth_coef: 0.01
+      progress_coef: 0.1
+      track_names:
+        - audit_sharp_switchback
+        - audit_offset_spike
+      sample_track_on_reset: true
+      start_distance: 3.0
+      start_longitudinal_jitter: 0.60
+      start_lateral_jitter: 0.75
+      start_vertical_jitter: 0.35
+      start_yaw_jitter: 0.60
+
+policy:
+  obs_dim: 78
+  action_dim: 4
+  hidden: [256, 256]
+
+bc:
+  n_expert_episodes: 100
+  n_epochs: 220
+  lr: 3.0e-4
+  batch_size: 256
+
+dagger:
+  n_rounds: 14
+  n_rollout_episodes: 12
+  n_epochs: 50
+  lr: 3.0e-4
+  batch_size: 256
+
+ppo:
+  n_steps: 2048
+  n_epochs: 10
+  batch_size: 64
+  lr: 1.0e-4
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.001
+  vf_coef: 0.5
+  bc_coef: 0.25
+  max_grad_norm: 0.5
+  init_log_std: -2.0
+  target_kl: 0.03
+  min_updates_before_clip_relax: 10
+  validation_interval_updates: 5
+  validation_episodes: 12
+  validation_seed: 1234
+  checkpoint_interval_updates: 5
+  total_timesteps: 360000
+  clip_schedule:
+    - [0,      0.25]
+    - [220000, 0.35]
+    - [320000, 0.5]

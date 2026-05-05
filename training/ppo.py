@@ -24,7 +24,8 @@ import yaml
 
 from env.gate_race_aviary import GateRaceAviary, make_env
 from eval.evaluate import evaluate
-from policy.actor import ActorCritic
+from policy.actor import build_actor_critic, policy_uses_images
+from policy.runtime import actor_critic_evaluate_actions, actor_critic_get_action, get_env_image, image_batch_to_tensor
 
 _EVAL_STAT_KEYS = [
     "episodes",
@@ -46,7 +47,14 @@ _EVAL_STAT_KEYS = [
 # ------------------------------------------------------------------
 
 class RolloutBuffer:
-    def __init__(self, n_steps: int, obs_dim: int, action_dim: int, device: str):
+    def __init__(
+        self,
+        n_steps: int,
+        obs_dim: int,
+        action_dim: int,
+        device: str,
+        image_shape: tuple[int, int, int] | None = None,
+    ):
         self.n      = n_steps
         self.device = device
         self.obs      = torch.zeros(n_steps, obs_dim,    device=device)
@@ -55,9 +63,12 @@ class RolloutBuffer:
         self.values   = torch.zeros(n_steps,             device=device)
         self.log_probs= torch.zeros(n_steps,             device=device)
         self.dones    = torch.zeros(n_steps,             device=device)
+        self.images   = None
+        if image_shape is not None:
+            self.images = torch.zeros(n_steps, *image_shape, dtype=torch.uint8, device=device)
         self.ptr = 0
 
-    def add(self, obs, action, reward, value, log_prob, done):
+    def add(self, obs, action, reward, value, log_prob, done, image=None):
         i = self.ptr
         self.obs[i]       = obs
         self.actions[i]   = action
@@ -65,6 +76,8 @@ class RolloutBuffer:
         self.values[i]    = value
         self.log_probs[i] = log_prob
         self.dones[i]     = done
+        if self.images is not None and image is not None:
+            self.images[i] = image
         self.ptr += 1
 
     def full(self) -> bool:
@@ -160,10 +173,11 @@ class PPOTrainer:
     def __init__(
         self,
         env: GateRaceAviary,
-        policy: ActorCritic,
+        policy,
         cfg: dict,
         bc_obs: torch.Tensor,
         bc_acts: torch.Tensor,
+        bc_imgs: torch.Tensor | None,
         device: str,
         val_envs: list[tuple[str, GateRaceAviary, float]] | None = None,
     ):
@@ -194,11 +208,18 @@ class PPOTrainer:
 
         obs_dim    = cfg["policy"]["obs_dim"]
         action_dim = cfg["policy"]["action_dim"]
-        self.buffer = RolloutBuffer(self.n_steps, obs_dim, action_dim, device)
+        self.use_images = bool(getattr(policy, "expects_image", False))
+        image_shape = tuple(int(v) for v in getattr(env, "policy_image_shape", ())) if self.use_images else None
+        self.buffer = RolloutBuffer(self.n_steps, obs_dim, action_dim, device, image_shape=image_shape)
         self.optimizer = torch.optim.Adam(policy.parameters(), lr=float(ppo["lr"]))
 
         self.bc_obs  = bc_obs.to(device)
         self.bc_acts = bc_acts.to(device)
+        if bc_imgs is not None and bc_imgs.ndim == 4 and bc_imgs.shape[-1] == 3:
+            bc_imgs = bc_imgs.permute(0, 3, 1, 2).contiguous()
+        self.bc_imgs = bc_imgs.to(device) if bc_imgs is not None else None
+        if self.use_images and self.bc_imgs is None:
+            raise ValueError("Multimodal PPO requires bc_imgs for BC regularization.")
 
         self._obs, _ = env.reset()
         self._global_step = 0
@@ -238,8 +259,13 @@ class PPOTrainer:
 
         while not self.buffer.full():
             obs_t = torch.from_numpy(self._obs).unsqueeze(0).to(self.device)
+            img_t = None
+            img_single = None
+            if self.use_images:
+                img_t = image_batch_to_tensor(get_env_image(self.env), self.device)
+                img_single = img_t.squeeze(0)
             with torch.no_grad():
-                action, log_prob, value = self.policy.get_action(obs_t)
+                action, log_prob, value = actor_critic_get_action(self.policy, obs_t, img_t)
             action_np = action.squeeze(0).cpu().numpy()
             next_obs, reward, terminated, truncated, info = self.env.step(action_np)
             done = terminated or truncated
@@ -251,6 +277,7 @@ class PPOTrainer:
                 value.squeeze(0),
                 log_prob.squeeze(0),
                 torch.tensor(float(done),  device=self.device),
+                image=img_single,
             )
             self._global_step += 1
             rollout_return += float(reward)
@@ -275,7 +302,8 @@ class PPOTrainer:
 
         with torch.no_grad():
             obs_t = torch.from_numpy(self._obs).unsqueeze(0).to(self.device)
-            _, _, last_value = self.policy.get_action(obs_t)
+            img_t = image_batch_to_tensor(get_env_image(self.env), self.device) if self.use_images else None
+            _, _, last_value = actor_critic_get_action(self.policy, obs_t, img_t)
 
         stats = {
             "episodes": float(completed_eps),
@@ -306,8 +334,9 @@ class PPOTrainer:
                 ret_b  = returns[bi]
                 adv_b  = advantages[bi]
                 old_lp = self.buffer.log_probs[bi]
+                img_b = self.buffer.images[bi] if self.buffer.images is not None else None
 
-                log_prob, entropy, value = self.policy.evaluate_actions(obs_b, act_b)
+                log_prob, entropy, value = actor_critic_evaluate_actions(self.policy, obs_b, act_b, img_b)
                 ratio = torch.exp(log_prob - old_lp)
                 approx_kl = (old_lp - log_prob).mean()
 
@@ -319,8 +348,11 @@ class PPOTrainer:
 
                 # BC auxiliary loss: keep policy close to DAgger reference dataset.
                 bc_idx  = torch.randint(len(self.bc_obs), (len(bi),), device=self.device)
-                bc_feats= self.policy.trunk(self.bc_obs[bc_idx])
-                bc_pred = self.policy._squash(self.policy.actor_mean(bc_feats))
+                if self.use_images:
+                    bc_mean, _, _ = self.policy.forward(self.bc_obs[bc_idx], self.bc_imgs[bc_idx])
+                else:
+                    bc_mean, _, _ = self.policy.forward(self.bc_obs[bc_idx])
+                bc_pred = self.policy._squash(bc_mean)
                 bc_loss = F.mse_loss(bc_pred, self.bc_acts[bc_idx])
 
                 loss = (pg_loss
@@ -517,18 +549,43 @@ def main():
     val_envs = _build_validation_envs(cfg)
 
     policy_cfg = cfg["policy"]
-    policy = ActorCritic(
-        obs_dim=policy_cfg["obs_dim"],
-        action_dim=policy_cfg["action_dim"],
-        hidden=policy_cfg["hidden"],
-        init_log_std=float(cfg["ppo"].get("init_log_std", -2.0)),
-    )
+    obs_dim = int(env.observation_space.shape[0])
+    cfg_obs_dim = int(policy_cfg.get("obs_dim", obs_dim))
+    if cfg_obs_dim != obs_dim:
+        raise ValueError(f"policy.obs_dim={cfg_obs_dim} does not match env observation dim {obs_dim}")
+    use_images = policy_uses_images(policy_cfg)
+    if use_images:
+        cfg_image_shape = tuple(int(v) for v in policy_cfg.get("image_shape", []))
+        env_image_shape = tuple(int(v) for v in getattr(env, "policy_image_shape", ()))
+        if cfg_image_shape != env_image_shape:
+            raise ValueError(
+                f"policy.image_shape={cfg_image_shape} does not match env image shape {env_image_shape}"
+            )
+    for suite_name, val_env, _ in val_envs:
+        val_obs_dim = int(val_env.observation_space.shape[0])
+        if val_obs_dim != obs_dim:
+            raise ValueError(
+                f"validation suite '{suite_name}' observation dim {val_obs_dim} "
+                f"does not match training env observation dim {obs_dim}"
+            )
+        if use_images:
+            val_image_shape = tuple(int(v) for v in getattr(val_env, "policy_image_shape", ()))
+            if val_image_shape != env_image_shape:
+                raise ValueError(
+                    f"validation suite '{suite_name}' image shape {val_image_shape} "
+                    f"does not match training env image shape {env_image_shape}"
+                )
+    build_cfg = dict(policy_cfg)
+    build_cfg["init_log_std"] = float(cfg["ppo"].get("init_log_std", -2.0))
+    policy = build_actor_critic(build_cfg)
 
     # Warm-start from DAgger checkpoint: remap DronePolicy keys → ActorCritic keys
     # net.0.* → trunk.0.*, net.2.* → trunk.2.*, net.4.* → actor_mean.*
     dagger_state = torch.load(args.dagger_ckpt, map_location=device)
     key_map = {}
     for k in dagger_state:
+        if k.startswith("image_encoder."):
+            key_map[k] = k
         if k.startswith("net.0."):
             key_map[k] = k.replace("net.0.", "trunk.0.")
         elif k.startswith("net.2."):
@@ -545,8 +602,16 @@ def main():
 
     bc_obs  = torch.from_numpy(np.load(os.path.join(args.dagger_data, "dataset_obs.npy")))
     bc_acts = torch.from_numpy(np.load(os.path.join(args.dagger_data, "dataset_act.npy")))
+    bc_imgs = None
+    if use_images:
+        img_path = os.path.join(args.dagger_data, "dataset_img.npy")
+        if not os.path.exists(img_path):
+            raise FileNotFoundError(
+                f"Expected multimodal DAgger dataset at {img_path}, but it was not found."
+            )
+        bc_imgs = torch.from_numpy(np.load(img_path))
 
-    trainer    = PPOTrainer(env, policy, cfg, bc_obs, bc_acts, device, val_envs=val_envs)
+    trainer    = PPOTrainer(env, policy, cfg, bc_obs, bc_acts, bc_imgs, device, val_envs=val_envs)
     final_ckpt = trainer.train(args.out)
     env.close()
     for _, val_env, _ in val_envs:
