@@ -179,6 +179,22 @@ Expert outputs same action space as learner (body-frame delta).
   and a tiny multimodal PPO rollout/update smoke worked.
   One bug was fixed during this pass:
   image datasets now normalize to `CHW` consistently across BC, DAgger, and PPO.
+- Current live multimodal run:
+  `train_all.py --config configs/multimodal_obs_v1.yaml`
+  BC is complete, DAgger is in progress, and `policy_dagger_r01.pt` plus `policy_dagger_r02.pt` are already written.
+- Quick evaluation signals:
+  `logs/bc_multimodal_obs_v1/policy_bc.pt` achieved aggregate held-out return `73.09` with `100%` completion in a short suite sweep.
+  By contrast, the detector-backed `vision_bridge` baseline for the old state-only PPO is poor:
+  `0%` completion and `100%` OOB over 5 episodes.
+- A follow-up config is now prepared:
+  `configs/multimodal_obs_v2.yaml`
+  It adds:
+  `warmstart_state_ckpt`,
+  `warmstart_state_type`,
+  `distill_teacher_ckpt`,
+  `distill_teacher_type`,
+  and `distill_coef`.
+  The intended teacher is `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`.
 - On this machine, some training/eval runs may need:
   `KMP_DUPLICATE_LIB_OK=TRUE`
   to work around a duplicate OpenMP runtime issue in the Conda env.

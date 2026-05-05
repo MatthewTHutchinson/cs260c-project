@@ -19,6 +19,7 @@ The current training flow is:
   onboard RGB rendering, detector-backed `vision_bridge` observations,
   scene visual randomization, and multimodal state+vision training are now implemented.
   The first multimodal config is `configs/multimodal_obs_v1.yaml`.
+  A teacher-warmstarted follow-up is prepared in `configs/multimodal_obs_v2.yaml`.
 
 If you want the strongest current model, start with `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`.
 
@@ -210,6 +211,16 @@ KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-projec
   --bc-out logs/bc_multimodal_obs_v1 \
   --dagger-out logs/dagger_multimodal_obs_v1 \
   --ppo-out logs/ppo_multimodal_obs_v1
+```
+
+Train the teacher-warmstarted multimodal follow-up:
+
+```bash
+KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python train_all.py \
+  --config configs/multimodal_obs_v2.yaml \
+  --bc-out logs/bc_multimodal_obs_v2 \
+  --dagger-out logs/dagger_multimodal_obs_v2 \
+  --ppo-out logs/ppo_multimodal_obs_v2
 ```
 
 ## Documentation workflow

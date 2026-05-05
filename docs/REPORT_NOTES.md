@@ -111,6 +111,15 @@ A staged imitation-to-RL pipeline is a practical way to bootstrap autonomous dro
   `configs/multimodal_obs_v1.yaml`
   -> `logs/ppo_multimodal_obs_v1`.
   BC already completed and DAgger is in progress.
+- Early multimodal result:
+  the first multimodal BC checkpoint achieved `100%` completion and aggregate return `73.09`
+  on a quick held-out suite sweep, which is a strong sign that adding images did not break the existing richer-state policy structure.
+- Very important perception result:
+  the old state-only PPO champion performs poorly when its structured gate inputs are replaced by the detector-backed `vision_bridge`.
+  That bridge baseline reached `0%` completion and `100%` OOB over 5 episodes on `vision_bridge_eval_v1`.
+  This is strong evidence that end-to-end or multimodal perception is necessary; simply reconstructing the old observation format with a lightweight detector is not enough.
+- A follow-up `multimodal_obs_v2` config is now prepared with state-teacher warm-start and distillation from the current best state-only PPO checkpoint.
+  This is a principled next step for the report because it reframes multimodal learning as transfer learning rather than cold-start replacement.
 - This gives the report a strong “future work became implementation” arc:
   the project no longer only discusses vision as a next idea;
   it now has an actual bridge and multimodal training path, even though the best completed results are still from the richer state-based PPO branch.

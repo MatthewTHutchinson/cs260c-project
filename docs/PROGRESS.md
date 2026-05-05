@@ -149,12 +149,44 @@ Suggested direction:
   BC dataset sizes:
   `dataset_obs.npy`, `dataset_act.npy`, and `dataset_img.npy` are all present.
   DAgger is active now.
-  `logs/dagger_multimodal_obs_v1/policy_dagger_r01.pt` is already saved,
-  and round 2 has begun.
+  `logs/dagger_multimodal_obs_v1/policy_dagger_r01.pt` and `policy_dagger_r02.pt` are saved,
+  and round 3 is underway.
+- Early results:
+  the current multimodal BC checkpoint already looks promising.
+  On a quick held-out suite sweep:
+  aggregate completion `100%`, crash `0%`, mean gates `4.29`, mean return `73.09`.
+  Per-track examples:
+  `heldout_pinched` return `80.00`,
+  `heldout_diamond` up to `77.16`,
+  and `heldout_lowhigh` `70.16`.
+- Important comparison:
+  the old state-only PPO champion performs very poorly when run through the detector-backed perception bridge.
+  On `configs/vision_bridge_eval_v1.yaml` over 5 episodes:
+  completion `0%`, OOB `100%`, mean return `-14.90`.
+  So the perception gap is real, and the multimodal branch is much more promising than relying on detector reconstruction alone.
 - Visual fix applied during this run:
   the top and bottom gate rails in the PyBullet scene were rotated correctly so the gate frame orientation now looks right on the previously problematic first and third gates.
 - Next action:
   let DAgger finish, then monitor the first PPO validation checkpoints and compare the eventual multimodal best checkpoint against `ppo_generalization_obs_v1`.
+
+### Run: `multimodal_obs_v2` (queued)
+
+- Date: 2026-05-05
+- Goal:
+  improve the multimodal branch by transferring the strong state-only control prior into the image-conditioned student instead of training the fused policy entirely from scratch.
+- Config:
+  `configs/multimodal_obs_v2.yaml`
+- New training changes:
+  multimodal BC now supports:
+  state-teacher warm-start,
+  and action-level distillation from a state-only teacher during BC and DAgger retraining.
+- Teacher choice:
+  `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`
+  as both the warm-start source and distillation teacher.
+- Smoke-test result:
+  warm-start transfer copied `6` tensors successfully into the multimodal student.
+- Queueing plan:
+  this run should begin after `multimodal_obs_v1` finishes so the two full pipelines do not overlap on CPU.
 
 ### Run: `generalization_robust_obs_v1` (in progress)
 

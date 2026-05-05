@@ -21,7 +21,7 @@ from env.gate_race_aviary import make_env
 from expert.expert_policy import ExpertPolicy
 from policy.actor import build_deterministic_policy, policy_uses_images
 from policy.runtime import get_env_image, image_batch_to_tensor, obs_batch_to_tensor, policy_act, policy_forward
-from training.bc import train_bc, dataset_to_tensors
+from training.bc import build_state_teacher, dataset_to_tensors, train_bc
 
 
 def rollout_policy(
@@ -99,6 +99,20 @@ def main():
     policy = build_deterministic_policy(policy_cfg, obs_dim=obs_dim)
     policy.load(args.bc_ckpt, device=device)
 
+    distill_teacher = None
+    distill_coef = float(policy_cfg.get("distill_coef", 0.0))
+    distill_ckpt = policy_cfg.get("distill_teacher_ckpt")
+    if distill_coef > 0.0 and distill_ckpt:
+        distill_teacher = build_state_teacher(
+            obs_dim=obs_dim,
+            policy_cfg=policy_cfg,
+            ppo_cfg=cfg.get("ppo", {}),
+            ckpt=str(distill_ckpt),
+            teacher_type=str(policy_cfg.get("distill_teacher_type", "ppo")),
+            device=device,
+        )
+        print(f"[DAgger] Distilling from state teacher with coef={distill_coef:.3f}")
+
     dagger_cfg = cfg["dagger"]
 
     # Load BC dataset as the initial aggregate dataset
@@ -141,6 +155,8 @@ def main():
         losses = train_bc(
             policy, obs_t, act_t,
             img_t=img_t,
+            teacher=distill_teacher,
+            distill_coef=distill_coef,
             n_epochs=dagger_cfg["n_epochs"],
             lr=dagger_cfg["lr"],
             batch_size=dagger_cfg["batch_size"],

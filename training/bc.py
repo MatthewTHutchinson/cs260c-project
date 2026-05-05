@@ -17,7 +17,13 @@ import yaml
 
 from env.gate_race_aviary import make_env
 from expert.expert_policy import ExpertPolicy
-from policy.actor import build_deterministic_policy, policy_uses_images
+from policy.actor import (
+    ActorCritic,
+    DronePolicy,
+    build_deterministic_policy,
+    policy_uses_images,
+    warmstart_multimodal_policy_from_state,
+)
 from policy.runtime import get_env_image, policy_forward
 
 
@@ -63,6 +69,34 @@ def dataset_to_tensors(dataset):
     return torch.from_numpy(obs_arr), torch.from_numpy(act_arr), img_t
 
 
+def build_state_teacher(
+    obs_dim: int,
+    policy_cfg: dict,
+    ppo_cfg: dict,
+    ckpt: str,
+    teacher_type: str,
+    device: str,
+):
+    teacher_type = str(teacher_type).strip().lower()
+    if teacher_type == "bc":
+        teacher = DronePolicy(
+            obs_dim=obs_dim,
+            action_dim=int(policy_cfg["action_dim"]),
+            hidden=policy_cfg.get("hidden"),
+        )
+    elif teacher_type == "ppo":
+        teacher = ActorCritic(
+            obs_dim=obs_dim,
+            action_dim=int(policy_cfg["action_dim"]),
+            hidden=policy_cfg.get("hidden"),
+            init_log_std=float(ppo_cfg.get("init_log_std", -2.0)),
+        )
+    else:
+        raise ValueError("teacher_type must be 'bc' or 'ppo'.")
+    teacher.load(ckpt, device=device).to(device).eval()
+    return teacher
+
+
 # ------------------------------------------------------------------
 # Training
 # ------------------------------------------------------------------
@@ -72,6 +106,8 @@ def train_bc(
     obs_t: torch.Tensor,
     act_t: torch.Tensor,
     img_t: torch.Tensor | None = None,
+    teacher=None,
+    distill_coef: float = 0.0,
     n_epochs: int = 200,
     lr: float = 3e-4,
     batch_size: int = 256,
@@ -81,6 +117,8 @@ def train_bc(
     obs_t, act_t = obs_t.to(device), act_t.to(device)
     if img_t is not None:
         img_t = img_t.to(device)
+    if teacher is not None:
+        teacher = teacher.to(device).eval()
     optimizer = torch.optim.Adam(policy.parameters(), lr=lr)
     n = len(obs_t)
     epoch_losses = []
@@ -93,6 +131,10 @@ def train_bc(
             batch_images = img_t[bi] if img_t is not None else None
             pred = policy_forward(policy, obs_t[bi], batch_images)
             loss = F.mse_loss(pred, act_t[bi])
+            if teacher is not None and distill_coef > 0.0:
+                with torch.no_grad():
+                    teacher_pred = teacher.act(obs_t[bi], deterministic=True)
+                loss = loss + float(distill_coef) * F.mse_loss(pred, teacher_pred)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -140,6 +182,42 @@ def main():
             )
     policy = build_deterministic_policy(policy_cfg, obs_dim=obs_dim)
 
+    warmstart_teacher = None
+    warmstart_ckpt = policy_cfg.get("warmstart_state_ckpt")
+    if collect_images and warmstart_ckpt:
+        warmstart_teacher = build_state_teacher(
+            obs_dim=obs_dim,
+            policy_cfg=policy_cfg,
+            ppo_cfg=cfg.get("ppo", {}),
+            ckpt=str(warmstart_ckpt),
+            teacher_type=str(policy_cfg.get("warmstart_state_type", "ppo")),
+            device=device,
+        )
+        transferred = warmstart_multimodal_policy_from_state(policy, warmstart_teacher)
+        print(f"[BC] Warm-started multimodal actor from state teacher ({transferred} tensors copied)")
+
+    distill_teacher = None
+    distill_coef = float(policy_cfg.get("distill_coef", 0.0))
+    distill_ckpt = policy_cfg.get("distill_teacher_ckpt")
+    if distill_coef > 0.0 and distill_ckpt:
+        if (
+            warmstart_teacher is not None
+            and str(distill_ckpt) == str(warmstart_ckpt)
+            and str(policy_cfg.get("distill_teacher_type", policy_cfg.get("warmstart_state_type", "ppo"))).strip().lower()
+                == str(policy_cfg.get("warmstart_state_type", "ppo")).strip().lower()
+        ):
+            distill_teacher = warmstart_teacher
+        else:
+            distill_teacher = build_state_teacher(
+                obs_dim=obs_dim,
+                policy_cfg=policy_cfg,
+                ppo_cfg=cfg.get("ppo", {}),
+                ckpt=str(distill_ckpt),
+                teacher_type=str(policy_cfg.get("distill_teacher_type", "ppo")),
+                device=device,
+            )
+        print(f"[BC] Distilling from state teacher with coef={distill_coef:.3f}")
+
     bc_cfg = cfg["bc"]
     print(f"[BC] Collecting {bc_cfg['n_expert_episodes']} expert episodes …")
     dataset = collect_expert_dataset(
@@ -156,6 +234,8 @@ def main():
     losses = train_bc(
         policy, obs_t, act_t,
         img_t=img_t,
+        teacher=distill_teacher,
+        distill_coef=distill_coef,
         n_epochs=bc_cfg["n_epochs"],
         lr=bc_cfg["lr"],
         batch_size=bc_cfg["batch_size"],

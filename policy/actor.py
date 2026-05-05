@@ -39,6 +39,32 @@ def _mlp(in_dim: int, hidden: list[int], out_dim: int, activate_out: bool = Fals
     return nn.Sequential(*layers)
 
 
+def _linear_layers(module: nn.Module) -> list[nn.Linear]:
+    return [m for m in module.modules() if isinstance(m, nn.Linear)]
+
+
+def _copy_linear(dst: nn.Linear, src: nn.Linear) -> int:
+    if dst.weight.shape != src.weight.shape or dst.bias.shape != src.bias.shape:
+        return 0
+    with torch.no_grad():
+        dst.weight.copy_(src.weight)
+        dst.bias.copy_(src.bias)
+    return 2
+
+
+def _copy_fused_first_linear(dst: nn.Linear, src: nn.Linear) -> int:
+    """Copy a state-only first layer into a fused state+image first layer."""
+    if dst.out_features != src.out_features or dst.bias.shape != src.bias.shape:
+        return 0
+    if dst.in_features < src.in_features:
+        return 0
+    with torch.no_grad():
+        dst.weight.zero_()
+        dst.weight[:, : src.in_features].copy_(src.weight)
+        dst.bias.copy_(src.bias)
+    return 2
+
+
 class _ImageEncoder(nn.Module):
     """Compact CNN for onboard RGB frames."""
 
@@ -310,6 +336,48 @@ class MultimodalActorCritic(nn.Module):
     def load(self, path: str, device: str = "cpu") -> "MultimodalActorCritic":
         self.load_state_dict(torch.load(path, map_location=device))
         return self
+
+
+def warmstart_multimodal_policy_from_state(student: MultimodalDronePolicy, teacher) -> int:
+    """Copy a state-only teacher's actor into a multimodal deterministic student."""
+    student_linears = _linear_layers(student.net)
+    if isinstance(teacher, DronePolicy):
+        teacher_hidden = _linear_layers(teacher.net)[:-1]
+        teacher_out = _linear_layers(teacher.net)[-1]
+    elif isinstance(teacher, ActorCritic):
+        teacher_hidden = _linear_layers(teacher.trunk)
+        teacher_out = teacher.actor_mean
+    else:
+        raise TypeError("Teacher must be DronePolicy or ActorCritic.")
+
+    transferred = 0
+    if student_linears and teacher_hidden:
+        transferred += _copy_fused_first_linear(student_linears[0], teacher_hidden[0])
+    for dst, src in zip(student_linears[1:-1], teacher_hidden[1:]):
+        transferred += _copy_linear(dst, src)
+    transferred += _copy_linear(student_linears[-1], teacher_out)
+    return transferred
+
+
+def warmstart_multimodal_actor_critic_from_state(student: MultimodalActorCritic, teacher) -> int:
+    """Copy a state-only teacher's actor into a multimodal PPO actor-critic."""
+    student_hidden = _linear_layers(student.trunk)
+    if isinstance(teacher, DronePolicy):
+        teacher_hidden = _linear_layers(teacher.net)[:-1]
+        teacher_out = _linear_layers(teacher.net)[-1]
+    elif isinstance(teacher, ActorCritic):
+        teacher_hidden = _linear_layers(teacher.trunk)
+        teacher_out = teacher.actor_mean
+    else:
+        raise TypeError("Teacher must be DronePolicy or ActorCritic.")
+
+    transferred = 0
+    if student_hidden and teacher_hidden:
+        transferred += _copy_fused_first_linear(student_hidden[0], teacher_hidden[0])
+    for dst, src in zip(student_hidden[1:], teacher_hidden[1:]):
+        transferred += _copy_linear(dst, src)
+    transferred += _copy_linear(student.actor_mean, teacher_out)
+    return transferred
 
 
 def build_deterministic_policy(policy_cfg: dict, obs_dim: int):

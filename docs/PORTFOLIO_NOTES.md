@@ -55,6 +55,10 @@ Focus on:
   the same audit that showed strong held-out robustness also exposed sharp OOD switchbacks and vertical recovery layouts as the next major failure cases.
 - Active extension:
   I have now implemented and started training a multimodal state+vision branch rather than only planning it on paper.
+- Early signal from that branch:
+  the first multimodal BC checkpoint already completes the held-out suite cleanly in a quick sweep, which suggests the added image stream is useful without sacrificing the strong state-based flight prior.
+- Also useful to mention honestly:
+  a detector-only perception bridge was much weaker than the multimodal path, so the project exposed a real perception gap instead of pretending that vision was already solved.
 - Current follow-up:
   I started a targeted robustness branch that retrains the full pipeline on new vertical and switchback-inspired tracks rather than only tuning PPO on the old distribution.
 - Outcome of that branch:
