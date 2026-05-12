@@ -2,7 +2,7 @@
 
 ## Current snapshot
 
-Date: 2026-05-03
+Date: 2026-05-12
 
 Current status:
 
@@ -10,50 +10,71 @@ Current status:
 - On the richer-observation hard held-out suite, that checkpoint achieved aggregate completion `99%`, crash `0%`, mean gates `4.97`, and mean return `82.49`.
 - On the richer-observation easy held-out suite, the same checkpoint achieved aggregate completion `100%`, crash `0%`, mean gates `5.00`, and mean return `82.95`.
 - The richer-observation branch is now clearly ahead of every earlier PPO family.
-- The upgraded richer-observation BC and DAgger baselines are also much stronger than the older imitation baselines:
-  BC hard-suite return `72.25`, DAgger hard-suite return `72.95`, both with `100%` completion on the evaluated hard tracks.
-- A dedicated robustness audit is now in place at `eval/robustness_audit.py` with scenario config `configs/robustness_obs_v1.yaml`.
-- On the audit's known-distribution sweeps, the current champion remained strong:
-  `100%` completion on `nominal_easy`,
-  `99.2%` on `nominal_hard_core`,
-  `98.3%` on `nominal_hard_zigzag`,
-  `98.3%` under heavier start-pose jitter,
-  and `98.3%` under action noise.
-- The main audited weakness is out-of-distribution geometry rather than mild sensor noise:
-  `ood_vertical` dropped to `76.7%` completion and `ood_switchback` dropped to `25.0%`.
-- The toughest in-distribution recurring weak spot is still `heldout_lowhigh`, which stays slower and slightly less reliable than the other held-out tracks.
+- The first full multimodal run has now completed:
+  `logs/ppo_multimodal_obs_v1/policy_ppo_best.pt`
+- Best internal validation snapshot for that multimodal run:
+  mixed return `72.75`,
+  easy return `74.60`,
+  hard-core return `74.57`,
+  hard-zigzag return `69.35`,
+  with mixed completion `100%`.
+- Quick 10-episode sanity evaluation of the multimodal PPO best checkpoint under `configs/multimodal_obs_v1.yaml`:
+  completion `90%`,
+  crash `0%`,
+  OOB `0%`,
+  mean return `65.69`,
+  mean gates `3.80`,
+  and mean finish time `530.7` steps.
+- Comparison caveat:
+  those quick multimodal numbers are not yet a like-for-like replacement for the earlier state-only held-out suite comparisons,
+  so they should be treated as promising but not yet definitive.
+- The detector-only `vision_bridge` path remains weak:
+  the old state-only PPO under `configs/vision_bridge_eval_v1.yaml` still reached `0%` completion and `100%` OOB in the quick bridge eval.
+- External source hygiene is now improved:
+  `docs/COMPETITION_NOTES.md` is the main source hierarchy for AI Grand Prix / DCL-facing facts,
+  anchored on `docs/260508_Technical_Spec_0002.pdf`.
+- The older Gmail PDF exports are now stored in `docs/` and should be treated as historical / possibly stale unless the latest spec confirms them.
+- The teacher-warmstarted follow-up is now active:
+  `configs/multimodal_obs_v2.yaml`
+  into
+  `logs/bc_multimodal_obs_v2`,
+  `logs/dagger_multimodal_obs_v2`,
+  and `logs/ppo_multimodal_obs_v2`.
 
 ## Immediate next step
 
 Decide whether to:
 
-- improve robustness first on the newly identified OOD vertical and switchback layouts
-- or start the later speed-focused branch once those failure modes are reduced
+- launch the teacher-warmstarted follow-up `configs/multimodal_obs_v2.yaml`
+- or pause and first tighten the multimodal evaluation story with a cleaner held-out re-evaluation pass
 
 Update:
 
-- the repo now has a first end-to-end perception branch:
-  onboard RGB camera rendering in `GateRaceAviary`,
+- the repo now has a completed first end-to-end perception branch:
+  onboard RGB rendering in `GateRaceAviary`,
   detector-backed `vision_bridge` observations,
   scene/lighting/domain randomization,
   and multimodal BC/DAgger/PPO support with a state+vision policy.
-- next concrete run is the first real multimodal pipeline:
-  `configs/multimodal_obs_v1.yaml`
-  into
+- the first full run artifacts are now all present in:
   `logs/bc_multimodal_obs_v1`,
   `logs/dagger_multimodal_obs_v1`,
   and `logs/ppo_multimodal_obs_v1`.
-- current live status:
-  multimodal BC finished with `48,080` transitions and final loss about `1e-5`,
-  and multimodal DAgger is now in progress with `policy_dagger_r01.pt` saved
-  and round 2 already underway.
+- the documentation set is also now organized around:
+  `PROGRESS`,
+  `REPORT_NOTES`,
+  `PORTFOLIO_NOTES`,
+  `BRAINSTORMING`,
+  and the new `COMPETITION_NOTES`.
+- active training has moved on to:
+  `train_all.py --config configs/multimodal_obs_v2.yaml`
+  with BC currently consuming CPU as expected.
 
 Suggested direction:
 
 - treat `generalization_obs_v1` as the new baseline for future work
-- use the robustness audit to target the next training distribution and expert/policy updates
-- postpone aggressive speed tuning until the OOD switchback and vertical failure cases improve
-- use the observation-upgrade result as a key storyline in the report and portfolio because it is the clearest architectural win so far
+- use `docs/COMPETITION_NOTES.md` whenever a simulator assumption needs to be compared against the real competition interface
+- keep any claim about highlighted gates, no-depth guarantees, or control abstraction tagged as historical unless the latest spec confirms it
+- use the observation-upgrade result as a key storyline in the report and portfolio because it is still the clearest architectural win so far
 
 ## What to record after each run
 
@@ -67,6 +88,69 @@ Suggested direction:
 - best checkpoint if intermediate checkpoints looked better than final
 
 ## Experiment log template
+
+### Run: `competition_source_reconciliation`
+
+- Date: 2026-05-12
+- Goal:
+  reconcile the repo docs against the latest external AI Grand Prix technical spec
+  and stop relying on stale brainstorming/email assumptions as if they were current truth.
+- Inputs reviewed:
+  `docs/260508_Technical_Spec_0002.pdf`
+  plus the older Gmail PDF exports now stored in `docs/`.
+- Confirmed additions captured:
+  MAVLink-over-UDP interface,
+  NED/body/camera frame conventions,
+  `20`-degree upward camera tilt,
+  pinhole intrinsics,
+  `640 x 360 @ 30 Hz` JPEG vision stream,
+  Windows 11 runtime note,
+  and the `8`-minute Round One duration cap.
+- Documentation changes:
+  added `docs/COMPETITION_NOTES.md`,
+  updated `README.md`,
+  refreshed the top-level snapshots in the docs,
+  and retired the old `brainstorming/` folder after preserving the still-useful points in markdown form.
+- Objectivity policy:
+  facts are now split into `Confirmed`, `Historical`, and `Inference` buckets.
+- Takeaway:
+  the project now has a much cleaner separation between
+  what the latest spec really says,
+  what came from older emails,
+  and what is still only a repo-side assumption.
+
+### Run: `multimodal_obs_v1` (completed)
+
+- Date logged: 2026-05-12
+- Goal:
+  train the first full state+vision branch using the richer `78`-D state vector plus onboard RGB input.
+- Final artifacts:
+  `logs/bc_multimodal_obs_v1/policy_bc.pt`
+  round checkpoints in `logs/dagger_multimodal_obs_v1/`
+  and `logs/ppo_multimodal_obs_v1/policy_ppo_best.pt`
+- Best internal validation snapshot:
+  mixed return `72.75`,
+  mixed completion `100%`,
+  easy return `74.60`,
+  hard-core return `74.57`,
+  hard-zigzag return `69.35`,
+  mixed mean finish steps `494.87`.
+- Quick external sanity evaluation:
+  `10` episodes under `configs/multimodal_obs_v1.yaml`
+  gave completion `90%`,
+  crash `0%`,
+  OOB `0%`,
+  mean return `65.69`,
+  mean gates `3.80`,
+  and mean finish time `530.7` steps.
+- Important comparison caveat:
+  the internal validation and the quick external eval do not yet give a clean one-number replacement for the state-only champion benchmarks.
+  This branch looks promising, but not yet clearly like the new overall winner.
+- Related negative result that still matters:
+  the detector-only `vision_bridge` remained much worse than the multimodal path.
+- Takeaway:
+  direct multimodal learning appears more viable than trying to reconstruct the old structured observation with a lightweight detector,
+  but the evaluation story still needs one cleaner apples-to-apples pass before making strong claims.
 
 ### Run: `robustness_obs_v1`
 

@@ -1,5 +1,25 @@
 # Brainstorming: Next Improvements, Limits, and Transfer Paths
 
+## How to read this file
+
+This document is intentionally exploratory.
+
+- Use `docs/COMPETITION_NOTES.md` for confirmed AI Grand Prix / DCL facts.
+- Use `docs/PROGRESS.md` for what actually ran.
+- Use this file for hypotheses, extension ideas, and design tradeoffs.
+
+Practical tags:
+
+- `Confirmed in repo`: implemented and verified in this codebase
+- `Historical`: older design reasoning that may no longer match the latest repo state
+- `Hypothesis`: promising but unverified direction
+
+Important note:
+
+- Some older sections below still refer to the earlier `36`-D state-only baseline.
+- Those sections are preserved as historical reasoning.
+- The current implemented baseline has already moved past that.
+
 ## Why this document exists
 
 This file captures the current brainstorming thread around:
@@ -11,7 +31,35 @@ This file captures the current brainstorming thread around:
 
 ## Current policy snapshot
 
-The current main policy is a small MLP actor / actor-critic:
+`Confirmed in repo`:
+
+- The current strongest completed state-only checkpoint is:
+  `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`
+- Its observation is no longer the old `36`-D baseline.
+- The richer state branch uses `78` floats:
+  `3` stacked frames of `26` features each.
+- Per-frame features now include:
+  body-frame velocity,
+  angular rates,
+  multi-gate relative geometry,
+  gate normals,
+  and heading-alignment features.
+- The action remains the same `4`-D waypoint-delta format:
+  `[dx_b, dy_b, dz_b, d_yaw]`.
+
+`Confirmed in repo`:
+
+- A first multimodal state+vision branch is also implemented and completed:
+  `logs/ppo_multimodal_obs_v1/policy_ppo_best.pt`
+- That branch uses the richer `78`-D state vector plus an onboard RGB image branch.
+- The detector-only `vision_bridge` baseline is much weaker than the multimodal policy path.
+
+`Historical`:
+
+- Earlier project planning was centered on a `36`-D state-only MLP.
+- That was a useful stepping stone, but it is no longer the best description of the repo.
+
+The original state-only actor / actor-critic family is still a small MLP:
 
 - input: `36` floats
 - structure: `36 -> 256 -> 256 -> 4` for BC/DAgger
@@ -33,7 +81,7 @@ Current action contents:
 - `dz_b`
 - `d_yaw`
 
-These actions are not direct motor commands. They are body-frame waypoint deltas and yaw deltas that get converted into a world-frame target for a classical PID controller.
+These actions are not direct motor commands. They are body-frame waypoint deltas and yaw deltas that get converted into a world-frame target for a classical controller.
 
 ## What the current design is good at
 

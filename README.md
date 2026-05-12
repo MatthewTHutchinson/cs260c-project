@@ -23,6 +23,15 @@ The current training flow is:
 
 If you want the strongest current model, start with `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`.
 
+## Competition context
+
+For external AI Grand Prix / DCL-facing facts, use:
+
+- `docs/COMPETITION_NOTES.md`
+- backing PDF: `docs/260508_Technical_Spec_0002.pdf`
+
+The older Gmail PDF exports in `docs/` are still useful context, but they should be treated as historical and possibly stale unless the latest spec also confirms them.
+
 ## Project map
 
 - `env/`: drone racing environment, gate logic, and future DCL adapter
@@ -231,9 +240,13 @@ Use these files as the shared documentation backbone:
 - `docs/REPORT_NOTES.md`: class report outline, claims, and evidence
 - `docs/PORTFOLIO_NOTES.md`: public-facing project story and visuals checklist
 - `docs/BRAINSTORMING.md`: roadmap, limitations, and future observation / vision plans
+- `docs/COMPETITION_NOTES.md`: current external source-of-truth notes, confidence labels, and open questions
 
 The intended workflow is simple:
 
 1. After each meaningful run, update `docs/PROGRESS.md`.
 2. When a result matters for the report, summarize it in `docs/REPORT_NOTES.md`.
 3. When a result is portfolio-worthy, translate it into the cleaner narrative in `docs/PORTFOLIO_NOTES.md`.
+4. When a competition-facing assumption changes, reconcile it in `docs/COMPETITION_NOTES.md`.
+
+Older drafts in the retired `brainstorming/` folder should no longer be treated as current documentation.

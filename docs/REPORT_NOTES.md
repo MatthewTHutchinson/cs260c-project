@@ -30,6 +30,33 @@ A staged imitation-to-RL pipeline is a practical way to bootstrap autonomous dro
 - Perception branch:
   onboard RGB rendering, detector-backed gate estimation, and a first multimodal state+vision policy path
 
+## Competition-facing constraints to state clearly
+
+- Latest external source of truth:
+  `docs/260508_Technical_Spec_0002.pdf`
+  (`VADR-TS-002`, Issue `00.02`, dated `2026-05-08`)
+- Official interface summary from that spec:
+  MAVLink 2 over UDP,
+  deterministic simulator,
+  `120 Hz` physics,
+  `640 x 360 @ 30 Hz` forward camera stream,
+  and an `8`-minute maximum Round One duration.
+- Coordinate/frame details worth explaining carefully:
+  NED convention,
+  body frame `X` forward / `Y` right / `Z` down,
+  and camera sharing the body origin with a `20`-degree upward tilt.
+- Official runtime note:
+  Windows 11 is the expected simulator platform and Linux is currently unsupported in the spec.
+
+## Claims to mark as preliminary or historical
+
+- Older Gmail PDFs suggested highlighted or guided VQ1 gates; that is useful context but not the latest ground truth.
+- Older Gmail PDFs said the API would not expose depth, engine RPM, or battery state of charge; keep those claims marked as historical unless a newer spec restates them.
+- Older emails used throttle / roll / pitch / yaw wording for control,
+  but the latest spec explicitly lists `SET_POSITION_TARGET_LOCAL_NED` and `SET_ATTITUDE_TARGET`,
+  so the old control wording should be treated as preliminary rather than authoritative.
+- The repo does not yet implement the final DCL MAVLink / UDP client path end to end, so do not overstate competition readiness.
+
 ## Evidence to collect
 
 - BC visual success examples
@@ -123,6 +150,18 @@ A staged imitation-to-RL pipeline is a practical way to bootstrap autonomous dro
 - This gives the report a strong “future work became implementation” arc:
   the project no longer only discusses vision as a next idea;
   it now has an actual bridge and multimodal training path, even though the best completed results are still from the richer state-based PPO branch.
+- The first full multimodal PPO run is now completed:
+  `logs/ppo_multimodal_obs_v1/policy_ppo_best.pt`
+  with best internal mixed validation return `72.75`,
+  easy `74.60`,
+  hard-core `74.57`,
+  and hard-zigzag `69.35`.
+- Important objectivity note:
+  the multimodal branch looks promising, but a quick external `10`-episode sanity eval under `configs/multimodal_obs_v1.yaml`
+  only reached `90%` completion and `65.69` mean return.
+  That means the multimodal result is encouraging, but it is not yet a clean new champion claim.
+- The new `docs/COMPETITION_NOTES.md` file is useful report scaffolding in its own right,
+  because it cleanly separates latest-spec facts from older email assumptions and repo-side inferences.
 
 ## Limitations to mention honestly
 

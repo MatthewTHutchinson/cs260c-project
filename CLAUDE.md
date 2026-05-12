@@ -198,13 +198,34 @@ Expert outputs same action space as learner (body-frame delta).
 - On this machine, some training/eval runs may need:
   `KMP_DUPLICATE_LIB_OK=TRUE`
   to work around a duplicate OpenMP runtime issue in the Conda env.
+- Added `docs/COMPETITION_NOTES.md` and moved the latest external reference PDF to:
+  `docs/260508_Technical_Spec_0002.pdf`
+  This is now the main competition-facing source hierarchy and confidence tracker.
+- The old `brainstorming/` folder has been retired after promoting the still-useful content into the `docs/` markdown files.
+- `multimodal_obs_v1` has completed end to end.
+  Artifacts now exist in:
+  `logs/bc_multimodal_obs_v1`,
+  `logs/dagger_multimodal_obs_v1`,
+  and `logs/ppo_multimodal_obs_v1`.
+- `multimodal_obs_v2` has now been started directly via:
+  `train_all.py --config configs/multimodal_obs_v2.yaml`
+  writing into
+  `logs/bc_multimodal_obs_v2`,
+  `logs/dagger_multimodal_obs_v2`,
+  and `logs/ppo_multimodal_obs_v2`.
 
 ## Notes for future Claude sessions
+- For external AI Grand Prix / DCL facts, start with:
+  `docs/COMPETITION_NOTES.md`
+  and only then consult
+  `docs/260508_Technical_Spec_0002.pdf`.
+- Treat the Gmail PDF exports in `docs/` as historical context, not primary truth.
+- Do not rely on the old `brainstorming/` directory; it has been retired.
 - If BC works but PPO regresses immediately, inspect PPO rollout crash rate and mean gates before assuming the reward is wrong.
 - The current expert implementation is still a simple gate-chasing heuristic in code, even though earlier planning notes mention spline/min-snap.
 - Use the Conda interpreter at `/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python` if the shell `python3` is missing project dependencies.
 - Documentation workflow now lives in `README.md` plus:
-  `docs/PROGRESS.md`, `docs/REPORT_NOTES.md`, `docs/PORTFOLIO_NOTES.md`, and `docs/BRAINSTORMING.md`.
+  `docs/PROGRESS.md`, `docs/REPORT_NOTES.md`, `docs/PORTFOLIO_NOTES.md`, `docs/BRAINSTORMING.md`, and `docs/COMPETITION_NOTES.md`.
 - After the zigzag-enriched imitation reruns, decide whether to spend another PPO run on the new DAgger checkpoint or move next to richer observations / stronger expert logic.
 - The next major training branch after the current PPO comparison should be `generalization_obs_v1`.
 - `generalization_obs_v1` is now the main champion branch to build on.

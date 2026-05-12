@@ -15,6 +15,7 @@ The project tackles a hard robotics problem: getting a drone to race through a s
 - Upgraded observation design with deeper gate lookahead and orientation-aware features
 - Onboard RGB camera rendering, gate visuals, and scene randomization inside the simulator
 - Detector-backed perception bridge and a first multimodal state+vision policy path
+- Competition-facing source reconciliation against the latest AI Grand Prix technical spec, with explicit confidence labels for confirmed vs. historical assumptions
 - Action space designed around waypoint deltas instead of raw motor commands
 - Sequential BC -> DAgger -> PPO training pipeline
 - PPO stabilization work to keep RL from destroying a good imitation policy
@@ -54,11 +55,16 @@ Focus on:
 - Honest nuance:
   the same audit that showed strong held-out robustness also exposed sharp OOD switchbacks and vertical recovery layouts as the next major failure cases.
 - Active extension:
-  I have now implemented and started training a multimodal state+vision branch rather than only planning it on paper.
-- Early signal from that branch:
-  the first multimodal BC checkpoint already completes the held-out suite cleanly in a quick sweep, which suggests the added image stream is useful without sacrificing the strong state-based flight prior.
+  I implemented and completed a first multimodal state+vision branch rather than only planning it on paper.
+- Current multimodal signal:
+  the first multimodal PPO run reached best internal mixed validation return `72.75`,
+  but a quick external `10`-episode sanity eval reached `90%` completion and `65.69` mean return,
+  so it is promising rather than a clean new overall winner.
 - Also useful to mention honestly:
   a detector-only perception bridge was much weaker than the multimodal path, so the project exposed a real perception gap instead of pretending that vision was already solved.
+- Honest competition gap:
+  the latest official spec now clearly defines a MAVLink / UDP + camera-stream interface,
+  and the current repo still approximates that in simulation rather than acting as a finished DCL runtime client.
 - Current follow-up:
   I started a targeted robustness branch that retrains the full pipeline on new vertical and switchback-inspired tracks rather than only tuning PPO on the old distribution.
 - Outcome of that branch:
