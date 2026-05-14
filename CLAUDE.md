@@ -213,6 +213,17 @@ Expert outputs same action space as learner (body-frame delta).
   `logs/bc_multimodal_obs_v2`,
   `logs/dagger_multimodal_obs_v2`,
   and `logs/ppo_multimodal_obs_v2`.
+  Latest observed state:
+  BC completed and DAgger is currently active.
+- Competition-spec alignment pass completed:
+  `GateDetector.CameraParams` now defaults to the latest spec's `640 x 360` / `[320, 320, 320, 180]` camera model,
+  `GateRaceAviary` now supports explicit camera intrinsics plus separate policy-image resizing,
+  and new evaluation configs exist at
+  `configs/competition_spec_bridge_eval.yaml`
+  and
+  `configs/competition_spec_multimodal_eval.yaml`.
+- `env/dcl_adapter.py` now fails fast instead of silently returning zero telemetry / fake observations.
+  It is still a scaffold, not a working competition client.
 
 ## Notes for future Claude sessions
 - For external AI Grand Prix / DCL facts, start with:
@@ -221,6 +232,8 @@ Expert outputs same action space as learner (body-frame delta).
   `docs/260508_Technical_Spec_0002.pdf`.
 - Treat the Gmail PDF exports in `docs/` as historical context, not primary truth.
 - Do not rely on the old `brainstorming/` directory; it has been retired.
+- The published spec's `[fx, fy]` and `VFoV` are not perfectly self-consistent.
+  Prefer explicit intrinsics when mirroring the competition camera in code.
 - If BC works but PPO regresses immediately, inspect PPO rollout crash rate and mean gates before assuming the reward is wrong.
 - The current expert implementation is still a simple gate-chasing heuristic in code, even though earlier planning notes mention spline/min-snap.
 - Use the Conda interpreter at `/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python` if the shell `python3` is missing project dependencies.

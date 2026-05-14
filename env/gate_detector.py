@@ -1,7 +1,10 @@
-"""Vision-based gate detector for the AI Grand Prix Virtual Qualifier.
+"""Vision-based gate detector scaffolding for the AI Grand Prix project.
 
-VQ1 is desaturated with highlighted gates — a hue/saturation filter is
-sufficient.  VQ2 drops visual aids; a more robust detector will be needed.
+This detector is a lightweight HSV-segmentation baseline inspired by older
+Virtual Qualifier messaging that suggested visually highlighted gates.
+The latest technical spec does not guarantee that presentation, so this
+detector should be treated as a provisional bridge rather than a
+competition-ready perception stack.
 
 Usage
 -----
@@ -37,13 +40,14 @@ class CameraParams:
     fx: float = 320.0     # focal length in pixels (x)
     fy: float = 320.0     # focal length in pixels (y)
     cx: float = 320.0     # principal point x
-    cy: float = 240.0     # principal point y
+    cy: float = 180.0     # principal point y
     width: int = 640
-    height: int = 480
+    height: int = 360
 
 
-# Default colour range for highlighted gates in VQ1 (high-saturation orange/yellow).
-# Tune these once you can observe the actual environment.
+# Default colour range for a high-saturation gate highlight.
+# This remains a historical/provisional assumption and should be retuned
+# against the real qualifier visuals.
 _VQ1_HSV_LO = np.array([10,  150, 150], dtype=np.uint8)   # H, S, V lower bound
 _VQ1_HSV_HI = np.array([35,  255, 255], dtype=np.uint8)   # H, S, V upper bound
 

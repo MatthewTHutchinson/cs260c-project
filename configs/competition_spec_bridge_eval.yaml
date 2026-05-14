@@ -1,0 +1,246 @@
+env:
+  ctrl_freq: 20
+  pyb_freq: 240
+  clip_radius_start: 0.25
+  clip_radius_end: 0.5
+  max_dyaw: 0.3
+  episode_len_sec: 30.0
+  history_len: 3
+  lookahead_gates: 3
+  include_gate_normals: true
+  include_relative_heading: true
+  observation_source: vision_bridge
+  vision_bridge_fallback: cache_track
+  vision_bridge_normal_source: track
+  vision_bridge_min_confidence: 0.12
+  smooth_coef: 0.01
+  progress_coef: 0.1
+  track_names:
+    - heldout_diamond
+    - heldout_tilted
+    - heldout_pinched
+    - heldout_lowhigh
+    - heldout_zigzag
+  sample_track_on_reset: true
+  start_distance: 3.0
+  start_longitudinal_jitter: 0.45
+  start_lateral_jitter: 0.50
+  start_vertical_jitter: 0.25
+  start_yaw_jitter: 0.40
+  camera:
+    enabled: true
+    width: 640
+    height: 360
+    fov: 90.0
+    tilt_deg: 20.0
+    offset_forward: 0.0
+    offset_up: 0.0
+    fx: 320.0
+    fy: 320.0
+    cx: 320.0
+    cy: 180.0
+    policy_width: 640
+    policy_height: 360
+    noise_std: 0.0
+    exposure_jitter: 0.0
+    occlusion_prob: 0.0
+    occlusion_count: 1
+    shadow: true
+  visual:
+    enabled: true
+    randomize: false
+    clutter_count: 10
+
+validation_suites:
+  - name: easy
+    weight: 0.35
+    env:
+      ctrl_freq: 20
+      pyb_freq: 240
+      clip_radius_start: 0.25
+      clip_radius_end: 0.5
+      max_dyaw: 0.3
+      episode_len_sec: 30.0
+      history_len: 3
+      lookahead_gates: 3
+      include_gate_normals: true
+      include_relative_heading: true
+      observation_source: vision_bridge
+      vision_bridge_fallback: cache_track
+      vision_bridge_normal_source: track
+      vision_bridge_min_confidence: 0.12
+      smooth_coef: 0.01
+      progress_coef: 0.1
+      track_names:
+        - heldout_diamond
+        - heldout_tilted
+      sample_track_on_reset: true
+      camera:
+        enabled: true
+        width: 640
+        height: 360
+        fov: 90.0
+        tilt_deg: 20.0
+        offset_forward: 0.0
+        offset_up: 0.0
+        fx: 320.0
+        fy: 320.0
+        cx: 320.0
+        cy: 180.0
+        policy_width: 640
+        policy_height: 360
+        noise_std: 0.0
+        exposure_jitter: 0.0
+        occlusion_prob: 0.0
+        occlusion_count: 1
+        shadow: true
+      visual:
+        enabled: true
+        randomize: false
+        clutter_count: 10
+  - name: hard_core
+    weight: 0.30
+    env:
+      ctrl_freq: 20
+      pyb_freq: 240
+      clip_radius_start: 0.25
+      clip_radius_end: 0.5
+      max_dyaw: 0.3
+      episode_len_sec: 30.0
+      history_len: 3
+      lookahead_gates: 3
+      include_gate_normals: true
+      include_relative_heading: true
+      observation_source: vision_bridge
+      vision_bridge_fallback: cache_track
+      vision_bridge_normal_source: track
+      vision_bridge_min_confidence: 0.12
+      smooth_coef: 0.01
+      progress_coef: 0.1
+      track_names:
+        - heldout_diamond
+        - heldout_tilted
+        - heldout_pinched
+        - heldout_lowhigh
+      sample_track_on_reset: true
+      start_distance: 3.0
+      start_longitudinal_jitter: 0.45
+      start_lateral_jitter: 0.50
+      start_vertical_jitter: 0.25
+      start_yaw_jitter: 0.40
+      camera:
+        enabled: true
+        width: 640
+        height: 360
+        fov: 90.0
+        tilt_deg: 20.0
+        offset_forward: 0.0
+        offset_up: 0.0
+        fx: 320.0
+        fy: 320.0
+        cx: 320.0
+        cy: 180.0
+        policy_width: 640
+        policy_height: 360
+        noise_std: 0.0
+        exposure_jitter: 0.0
+        occlusion_prob: 0.0
+        occlusion_count: 1
+        shadow: true
+      visual:
+        enabled: true
+        randomize: false
+        clutter_count: 10
+  - name: hard_zigzag
+    weight: 0.35
+    env:
+      ctrl_freq: 20
+      pyb_freq: 240
+      clip_radius_start: 0.25
+      clip_radius_end: 0.5
+      max_dyaw: 0.3
+      episode_len_sec: 30.0
+      history_len: 3
+      lookahead_gates: 3
+      include_gate_normals: true
+      include_relative_heading: true
+      observation_source: vision_bridge
+      vision_bridge_fallback: cache_track
+      vision_bridge_normal_source: track
+      vision_bridge_min_confidence: 0.12
+      smooth_coef: 0.01
+      progress_coef: 0.1
+      track_names:
+        - heldout_zigzag
+      sample_track_on_reset: true
+      start_distance: 3.0
+      start_longitudinal_jitter: 0.45
+      start_lateral_jitter: 0.55
+      start_vertical_jitter: 0.25
+      start_yaw_jitter: 0.45
+      camera:
+        enabled: true
+        width: 640
+        height: 360
+        fov: 90.0
+        tilt_deg: 20.0
+        offset_forward: 0.0
+        offset_up: 0.0
+        fx: 320.0
+        fy: 320.0
+        cx: 320.0
+        cy: 180.0
+        policy_width: 640
+        policy_height: 360
+        noise_std: 0.0
+        exposure_jitter: 0.0
+        occlusion_prob: 0.0
+        occlusion_count: 1
+        shadow: true
+      visual:
+        enabled: true
+        randomize: false
+        clutter_count: 10
+
+policy:
+  obs_dim: 78
+  action_dim: 4
+  hidden: [256, 256]
+
+bc:
+  n_expert_episodes: 80
+  n_epochs: 200
+  lr: 3.0e-4
+  batch_size: 256
+
+dagger:
+  n_rounds: 12
+  n_rollout_episodes: 12
+  n_epochs: 50
+  lr: 3.0e-4
+  batch_size: 256
+
+ppo:
+  n_steps: 2048
+  n_epochs: 10
+  batch_size: 64
+  lr: 1.0e-4
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.001
+  vf_coef: 0.5
+  bc_coef: 0.25
+  max_grad_norm: 0.5
+  init_log_std: -2.0
+  target_kl: 0.03
+  min_updates_before_clip_relax: 10
+  validation_interval_updates: 5
+  validation_episodes: 12
+  validation_seed: 1234
+  checkpoint_interval_updates: 5
+  total_timesteps: 300000
+  clip_schedule:
+    - [0,      0.25]
+    - [180000, 0.35]
+    - [260000, 0.5]

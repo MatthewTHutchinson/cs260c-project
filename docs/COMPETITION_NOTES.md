@@ -47,6 +47,9 @@ This file is the organized reference for external AI Grand Prix / DCL-facing con
 - `Confirmed`: principal point is `[320, 180]`.
 - `Confirmed`: focal lengths are `[320, 320]`.
 - `Confirmed`: vertical field of view is `90` degrees.
+- `Open`: the published intrinsics and published `VFoV` are not perfectly self-consistent under a standard pinhole model.
+  The repo now supports explicit intrinsics overrides so we can mirror the stated `[fx, fy, cx, cy]`
+  directly instead of deriving everything from one FOV formula.
 
 ### Communications and control
 
@@ -119,6 +122,8 @@ These are still useful for planning context, but should be treated as provisiona
   `30 Hz`,
   pinhole intrinsics,
   and a `20`-degree upward tilt.
+- `Inference`: the repo now supports explicit camera intrinsics overrides and separate policy-image resizing,
+  so competition-aligned evaluation can render spec-sized frames while still feeding existing `128 x 96` multimodal policies.
 - `Inference`: the current multimodal and perception-bridge work is directionally aligned with the official spec because the spec clearly expects combined telemetry and forward-camera processing.
 - `Inference`: the current best completed policies still rely on simulator-side structure and are not yet validated through a real MAVLink / UDP SITL bridge.
 

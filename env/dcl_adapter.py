@@ -1,7 +1,8 @@
 """DCL Competition Platform Adapter.
 
-This file is a STUB.  Fill in the TODO sections once Anduril/DCL release
-the official Python API documentation (expected ~April/May 2026).
+This file is a scaffold, not a working competition client.
+It has not yet been wired to the official MAVLink / UDP runtime described in
+`docs/260508_Technical_Spec_0002.pdf`, and it should fail fast if used.
 
 Architecture
 ------------
@@ -10,14 +11,19 @@ expert can run unchanged against the competition platform.
 
 Observation building
 --------------------
-The competition provides telemetry (pos, vel, orientation) and a camera
-frame.  We use GateDetector to estimate relative gate positions and
-construct the same history-stacked 12-D observation our policy expects.
+The latest spec provides telemetry plus a forward camera stream.
+This scaffold still sketches only a legacy 12-D bridge
+(velocity, angular rate, next-two-gate geometry), which is not compatible
+with the repo's current 78-D richer-state models or the multimodal image
+policies without additional work.
 
 Control
 -------
-The DCL platform accepts Throttle/Roll/Pitch/Yaw commands.  We run a
-lightweight PID that converts waypoint-delta actions into RPYT.
+The latest spec explicitly lists MAVLink messages such as
+`SET_POSITION_TARGET_LOCAL_NED` and `SET_ATTITUDE_TARGET`.
+Older project notes talked about Throttle/Roll/Pitch/Yaw commands, but that
+should now be treated as historical wording rather than a confirmed
+competition interface.
 """
 
 from collections import deque
@@ -85,7 +91,13 @@ class _WaypointToPIDController:
 # -----------------------------------------------------------------------
 
 class DCLRacingEnv(AbstractDroneRacingEnv):
-    """Wraps the DCL competition API behind AbstractDroneRacingEnv.
+    """Wraps the future DCL competition API behind AbstractDroneRacingEnv.
+
+    Important:
+    This class is currently a non-operational scaffold. It is preserved to
+    document the intended abstraction boundary, but it does not yet implement
+    the real MAVLink control loop, UDP vision stream reassembly, or the
+    current richer observation formats used by the repo's best policies.
 
     Parameters
     ----------
@@ -171,67 +183,16 @@ class DCLRacingEnv(AbstractDroneRacingEnv):
         }
 
     def reset(self, seed=None, options=None):
-        # TODO: call dcl_api.reset() or equivalent
-        # self._api.reset()
-
-        self._next_gate    = 0
-        self._gates_passed = 0
-        self._obs_buffer.clear()
-        for _ in range(self.history_len):
-            self._obs_buffer.append(np.zeros(12, dtype=np.float32))
-
-        obs = self._build_obs()
-        info = {"gates_passed": 0, "next_gate": 0}
-        return obs, info
-
-    def step(self, action: np.ndarray):
-        """Execute one control step.
-
-        1. Convert waypoint-delta action → RPYT via PID.
-        2. Send RPYT to DCL platform.
-        3. Poll telemetry + camera frame.
-        4. Build observation.
-        5. Return (obs, reward, terminated, truncated, info).
-        """
-        telemetry = self._get_telemetry()
-        rpyt = self._pid.compute(
-            pos=telemetry["pos"],
-            vel=telemetry["vel"],
-            rpy=telemetry["rpy"],
-            action=action,
-            clip_radius=self.clip_radius,
-            max_dyaw=self.max_dyaw,
+        raise NotImplementedError(
+            "DCLRacingEnv is a scaffold only. "
+            "It has not yet been wired to the official MAVLink / UDP runtime."
         )
 
-        # TODO: send command to DCL platform
-        # self._api.send_command(throttle=rpyt[0], roll=rpyt[1],
-        #                        pitch=rpyt[2], yaw=rpyt[3])
-
-        # TODO: wait for next timestep / receive updated state
-        # next_telemetry = self._get_telemetry()
-        # frame = self._api.get_frame()
-
-        obs = self._build_obs()
-
-        # TODO: parse gate events from DCL info dict
-        gate_passed = False   # self._api.get_gate_events()
-        crashed     = False   # self._api.is_crashed()
-        timed_out   = False   # self._api.is_timed_out()
-
-        if gate_passed:
-            self._gates_passed += 1
-            self._next_gate += 1
-
-        reward = (10.0 if gate_passed else 0.0) - (50.0 if crashed else 0.0)
-        terminated = crashed
-        truncated  = timed_out
-        info = {
-            "gate_passed":   gate_passed,
-            "gates_passed":  self._gates_passed,
-            "next_gate":     self._next_gate,
-            "collision":     crashed,
-        }
-        return obs, reward, terminated, truncated, info
+    def step(self, action: np.ndarray):
+        raise NotImplementedError(
+            "DCLRacingEnv is a scaffold only. "
+            "Implement MAVLink control, telemetry polling, and vision reassembly first."
+        )
 
     def close(self) -> None:
         # TODO: self._api.close()
@@ -242,26 +203,12 @@ class DCLRacingEnv(AbstractDroneRacingEnv):
     # ------------------------------------------------------------------
 
     def _get_telemetry(self) -> dict:
-        """Poll the DCL API for current drone state.
-
-        TODO: replace stub with real API calls.
-        """
-        # Placeholder values
-        return {
-            "pos":     np.zeros(3, dtype=np.float64),
-            "quat":    np.array([0.0, 0.0, 0.0, 1.0], dtype=np.float64),
-            "rpy":     np.zeros(3, dtype=np.float64),
-            "vel":     np.zeros(3, dtype=np.float64),
-            "ang_vel": np.zeros(3, dtype=np.float64),
-        }
+        """Poll the DCL API for current drone state."""
+        raise NotImplementedError("Telemetry polling is not implemented for DCLRacingEnv yet.")
 
     def _get_frame(self) -> Optional[np.ndarray]:
-        """Get the latest camera frame from the DCL API.
-
-        TODO: replace stub with real API call.
-        Returns BGR ndarray or None.
-        """
-        return None  # self._api.get_frame()
+        """Get the latest decoded camera frame from the DCL API."""
+        raise NotImplementedError("Vision-stream decoding is not implemented for DCLRacingEnv yet.")
 
     def _build_obs(self) -> np.ndarray:
         """Construct the history-stacked 12-D observation for the policy."""

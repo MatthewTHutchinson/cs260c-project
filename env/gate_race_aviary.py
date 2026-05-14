@@ -85,6 +85,16 @@ def _quat_from_axes(x_axis: np.ndarray, y_axis: np.ndarray, z_axis: np.ndarray) 
     return _quat_from_rotation_matrix(rot)
 
 
+def _resize_rgb_image(image: np.ndarray, width: int, height: int) -> np.ndarray:
+    """Resize an RGB image to the requested policy resolution."""
+    src_h, src_w = image.shape[:2]
+    if src_w == width and src_h == height:
+        return image.copy()
+    x_idx = np.clip(np.round(np.linspace(0, src_w - 1, width)).astype(np.int32), 0, src_w - 1)
+    y_idx = np.clip(np.round(np.linspace(0, src_h - 1, height)).astype(np.int32), 0, src_h - 1)
+    return image[y_idx][:, x_idx].copy()
+
+
 def compute_single_obs_dim(
     lookahead_gates: int = 2,
     include_gate_normals: bool = False,
@@ -161,6 +171,12 @@ class GateRaceAviary(BaseAviary):
         camera_tilt_deg: float = 8.0,
         camera_offset_forward: float = 0.08,
         camera_offset_up: float = 0.03,
+        camera_fx: Optional[float] = None,
+        camera_fy: Optional[float] = None,
+        camera_cx: Optional[float] = None,
+        camera_cy: Optional[float] = None,
+        camera_policy_width: Optional[int] = None,
+        camera_policy_height: Optional[int] = None,
         camera_near: float = 0.03,
         camera_far: float = 25.0,
         camera_noise_std: float = 0.0,
@@ -229,6 +245,8 @@ class GateRaceAviary(BaseAviary):
         self._camera_tilt_deg = float(camera_tilt_deg)
         self._camera_offset_forward = float(camera_offset_forward)
         self._camera_offset_up = float(camera_offset_up)
+        self._policy_camera_width = int(camera_policy_width or camera_width)
+        self._policy_camera_height = int(camera_policy_height or camera_height)
         self._camera_near = float(camera_near)
         self._camera_far = float(camera_far)
         self._camera_noise_std = float(camera_noise_std)
@@ -239,8 +257,13 @@ class GateRaceAviary(BaseAviary):
             width=self._camera_width,
             height=self._camera_height,
             fov_deg=self._camera_fov,
+            fx=camera_fx,
+            fy=camera_fy,
+            cx=camera_cx,
+            cy=camera_cy,
         )
         self._last_camera_frame: Optional[np.ndarray] = None
+        self._last_policy_camera_frame: Optional[np.ndarray] = None
         self._last_camera_depth: Optional[np.ndarray] = None
         self._last_camera_detections = []
         self._last_detected_rel_gates: list[Optional[np.ndarray]] = [None] * self.lookahead_gates
@@ -307,7 +330,7 @@ class GateRaceAviary(BaseAviary):
 
     @property
     def policy_image_shape(self) -> tuple[int, int, int]:
-        return 3, self._camera_height, self._camera_width
+        return 3, self._policy_camera_height, self._policy_camera_width
 
     def set_clip_radius(self, r: float) -> None:
         """Update clip_radius mid-training (curriculum)."""
@@ -329,6 +352,11 @@ class GateRaceAviary(BaseAviary):
         }
 
     def get_last_camera_frame(self) -> Optional[np.ndarray]:
+        if self._last_policy_camera_frame is None:
+            return None
+        return self._last_policy_camera_frame.copy()
+
+    def get_last_camera_frame_fullres(self) -> Optional[np.ndarray]:
         if self._last_camera_frame is None:
             return None
         return self._last_camera_frame.copy()
@@ -628,19 +656,31 @@ class GateRaceAviary(BaseAviary):
 
     def _reset_camera_cache(self) -> None:
         self._last_camera_frame = None
+        self._last_policy_camera_frame = None
         self._last_camera_depth = None
         self._last_camera_detections = []
         self._last_detected_rel_gates = [None] * self.lookahead_gates
         self._last_detection_confidences = np.zeros(self.lookahead_gates, dtype=np.float32)
 
-    def _build_camera_params(self, width: int, height: int, fov_deg: float) -> CameraParams:
-        fy = 0.5 * float(height) / np.tan(0.5 * np.deg2rad(fov_deg))
-        fx = fy
+    def _build_camera_params(
+        self,
+        width: int,
+        height: int,
+        fov_deg: float,
+        fx: Optional[float] = None,
+        fy: Optional[float] = None,
+        cx: Optional[float] = None,
+        cy: Optional[float] = None,
+    ) -> CameraParams:
+        if fy is None:
+            fy = 0.5 * float(height) / np.tan(0.5 * np.deg2rad(fov_deg))
+        if fx is None:
+            fx = fy
         return CameraParams(
             fx=float(fx),
             fy=float(fy),
-            cx=0.5 * float(width),
-            cy=0.5 * float(height),
+            cx=float(cx if cx is not None else 0.5 * float(width)),
+            cy=float(cy if cy is not None else 0.5 * float(height)),
             width=int(width),
             height=int(height),
         )
@@ -1053,6 +1093,11 @@ class GateRaceAviary(BaseAviary):
         rgb = self._postprocess_camera_frame(rgb)
 
         self._last_camera_frame = rgb
+        self._last_policy_camera_frame = _resize_rgb_image(
+            rgb,
+            width=self._policy_camera_width,
+            height=self._policy_camera_height,
+        )
         self._last_camera_depth = np.asarray(depth).reshape(self._camera_height, self._camera_width)
         return rgb
 
@@ -1231,6 +1276,38 @@ def make_env(cfg: dict, gui: bool = False, camera_follow: bool = False) -> GateR
         camera_tilt_deg=float(camera_cfg.get("tilt_deg", cfg.get("camera_tilt_deg", 8.0))),
         camera_offset_forward=float(camera_cfg.get("offset_forward", cfg.get("camera_offset_forward", 0.08))),
         camera_offset_up=float(camera_cfg.get("offset_up", cfg.get("camera_offset_up", 0.03))),
+        camera_fx=(
+            float(camera_cfg.get("fx", cfg.get("camera_fx")))
+            if ("fx" in camera_cfg or "camera_fx" in cfg)
+            else None
+        ),
+        camera_fy=(
+            float(camera_cfg.get("fy", cfg.get("camera_fy")))
+            if ("fy" in camera_cfg or "camera_fy" in cfg)
+            else None
+        ),
+        camera_cx=(
+            float(camera_cfg.get("cx", cfg.get("camera_cx")))
+            if ("cx" in camera_cfg or "camera_cx" in cfg)
+            else None
+        ),
+        camera_cy=(
+            float(camera_cfg.get("cy", cfg.get("camera_cy")))
+            if ("cy" in camera_cfg or "camera_cy" in cfg)
+            else None
+        ),
+        camera_policy_width=int(
+            camera_cfg.get(
+                "policy_width",
+                cfg.get("camera_policy_width", camera_cfg.get("width", cfg.get("camera_width", 128))),
+            )
+        ),
+        camera_policy_height=int(
+            camera_cfg.get(
+                "policy_height",
+                cfg.get("camera_policy_height", camera_cfg.get("height", cfg.get("camera_height", 96))),
+            )
+        ),
         camera_near=float(camera_cfg.get("near", cfg.get("camera_near", 0.03))),
         camera_far=float(camera_cfg.get("far", cfg.get("camera_far", 25.0))),
         camera_noise_std=float(camera_cfg.get("noise_std", cfg.get("camera_noise_std", 0.0))),

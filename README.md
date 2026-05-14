@@ -212,6 +212,24 @@ KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-projec
   --ckpt logs/ppo_generalization_obs_v1/policy_ppo_best.pt
 ```
 
+Run a spec-aligned bridge evaluation with the latest competition camera assumptions:
+
+```bash
+KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.evaluate_track_suite \
+  --config configs/competition_spec_bridge_eval.yaml \
+  --type ppo \
+  --ckpt logs/ppo_generalization_obs_v1/policy_ppo_best.pt
+```
+
+Evaluate a multimodal checkpoint under spec-sized rendering with downsampled policy inputs:
+
+```bash
+KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.evaluate_track_suite \
+  --config configs/competition_spec_multimodal_eval.yaml \
+  --type ppo \
+  --ckpt logs/ppo_multimodal_obs_v1/policy_ppo_best.pt
+```
+
 Train the first multimodal state+vision branch:
 
 ```bash

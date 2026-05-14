@@ -40,6 +40,10 @@ Current status:
   `logs/bc_multimodal_obs_v2`,
   `logs/dagger_multimodal_obs_v2`,
   and `logs/ppo_multimodal_obs_v2`.
+- A competition-spec alignment pass is now also complete:
+  the repo has explicit camera intrinsics support,
+  spec-aligned bridge and multimodal eval configs,
+  and a fail-fast DCL adapter scaffold.
 
 ## Immediate next step
 
@@ -67,7 +71,7 @@ Update:
   and the new `COMPETITION_NOTES`.
 - active training has moved on to:
   `train_all.py --config configs/multimodal_obs_v2.yaml`
-  with BC currently consuming CPU as expected.
+  and the run has now advanced through BC into DAgger.
 
 Suggested direction:
 
@@ -151,6 +155,32 @@ Suggested direction:
 - Takeaway:
   direct multimodal learning appears more viable than trying to reconstruct the old structured observation with a lightweight detector,
   but the evaluation story still needs one cleaner apples-to-apples pass before making strong claims.
+
+### Run: `competition_spec_alignment_update`
+
+- Date: 2026-05-13
+- Goal:
+  bring the repo's camera/perception assumptions closer to
+  `docs/260508_Technical_Spec_0002.pdf`
+  without breaking the faster research-oriented training configs.
+- Code changes:
+  `GateDetector.CameraParams` now defaults to the latest spec's
+  `640 x 360` image model with `[fx, fy, cx, cy] = [320, 320, 320, 180]`.
+  `GateRaceAviary` now supports explicit camera intrinsics overrides
+  plus separate policy-image resizing, so we can render spec-sized frames
+  and still feed `128 x 96` multimodal policies.
+  `env/dcl_adapter.py` now fails fast instead of silently returning zero telemetry.
+- New configs:
+  `configs/competition_spec_bridge_eval.yaml`
+  and
+  `configs/competition_spec_multimodal_eval.yaml`
+- Important caveat:
+  the published spec's stated intrinsics and stated `VFoV` are not perfectly self-consistent under a standard pinhole model.
+  The repo now mirrors the explicit intrinsics directly and keeps that inconsistency flagged in `docs/COMPETITION_NOTES.md`.
+- Takeaway:
+  the project is still not a finished DCL runtime client,
+  but its evaluation path is now closer to the official camera/interface assumptions
+  and less dependent on stale historical defaults.
 
 ### Run: `robustness_obs_v1`
 

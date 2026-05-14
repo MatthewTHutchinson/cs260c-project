@@ -47,6 +47,9 @@ A staged imitation-to-RL pipeline is a practical way to bootstrap autonomous dro
   and camera sharing the body origin with a `20`-degree upward tilt.
 - Official runtime note:
   Windows 11 is the expected simulator platform and Linux is currently unsupported in the spec.
+- Camera-model nuance to mention honestly:
+  the published intrinsics and published `VFoV` are not perfectly self-consistent,
+  so the repo now mirrors the explicit intrinsics directly and keeps that discrepancy flagged.
 
 ## Claims to mark as preliminary or historical
 
@@ -56,6 +59,7 @@ A staged imitation-to-RL pipeline is a practical way to bootstrap autonomous dro
   but the latest spec explicitly lists `SET_POSITION_TARGET_LOCAL_NED` and `SET_ATTITUDE_TARGET`,
   so the old control wording should be treated as preliminary rather than authoritative.
 - The repo does not yet implement the final DCL MAVLink / UDP client path end to end, so do not overstate competition readiness.
+- The DCL adapter file is now explicitly fail-fast rather than silently behaving like a working client.
 
 ## Evidence to collect
 
