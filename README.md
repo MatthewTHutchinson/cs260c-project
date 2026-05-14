@@ -250,6 +250,34 @@ KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-projec
   --ppo-out logs/ppo_multimodal_obs_v2
 ```
 
+Resume an interrupted run from the latest completed stage and saved trainer state:
+
+```bash
+KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python train_all.py \
+  --config configs/multimodal_obs_v2.yaml \
+  --bc-out logs/bc_multimodal_obs_v2 \
+  --dagger-out logs/dagger_multimodal_obs_v2 \
+  --ppo-out logs/ppo_multimodal_obs_v2 \
+  --resume
+```
+
+On macOS, keep the machine awake during long training runs:
+
+```bash
+caffeinate -dimsu -w <train_all_pid>
+```
+
+This prevents idle sleep, but it will not survive shutdown, reboot, or closing the laptop lid.
+
+Quick visualization presets:
+
+```bash
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.visualize --preset state_champion
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.visualize --preset multimodal_v1
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.visualize --preset competition_multimodal_v1
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.visualize --preset multimodal_v2_bc
+```
+
 ## Documentation workflow
 
 Use these files as the shared documentation backbone:

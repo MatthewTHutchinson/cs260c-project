@@ -166,6 +166,11 @@ A staged imitation-to-RL pipeline is a practical way to bootstrap autonomous dro
   That means the multimodal result is encouraging, but it is not yet a clean new champion claim.
 - The new `docs/COMPETITION_NOTES.md` file is useful report scaffolding in its own right,
   because it cleanly separates latest-spec facts from older email assumptions and repo-side inferences.
+- Operationally, long-running laptop training needed explicit resilience work:
+  the repo now supports stage-aware `train_all.py --resume`,
+  round-level DAgger resume,
+  and PPO trainer-state resume.
+  This is practical infrastructure rather than algorithmic novelty, but it matters for reproducibility.
 
 ## Limitations to mention honestly
 

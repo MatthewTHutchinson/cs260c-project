@@ -2,7 +2,7 @@
 
 ## Current snapshot
 
-Date: 2026-05-12
+Date: 2026-05-14
 
 Current status:
 
@@ -40,17 +40,25 @@ Current status:
   `logs/bc_multimodal_obs_v2`,
   `logs/dagger_multimodal_obs_v2`,
   and `logs/ppo_multimodal_obs_v2`.
+- `multimodal_obs_v2` has progressed through BC and is currently in DAgger.
+  The first saved round checkpoint is:
+  `logs/dagger_multimodal_obs_v2/policy_dagger_r01.pt`.
 - A competition-spec alignment pass is now also complete:
   the repo has explicit camera intrinsics support,
   spec-aligned bridge and multimodal eval configs,
   and a fail-fast DCL adapter scaffold.
+- Training resilience is now improved:
+  `train_all.py --resume` skips completed stages,
+  DAgger saves round-level resume artifacts,
+  and PPO writes `trainer_state_latest.pt` for update-level restart.
 
 ## Immediate next step
 
-Decide whether to:
+Finish `multimodal_obs_v2`, then compare it against:
 
-- launch the teacher-warmstarted follow-up `configs/multimodal_obs_v2.yaml`
-- or pause and first tighten the multimodal evaluation story with a cleaner held-out re-evaluation pass
+- `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`
+- `logs/ppo_multimodal_obs_v1/policy_ppo_best.pt`
+- the new competition-spec multimodal evaluation config
 
 Update:
 
@@ -77,6 +85,7 @@ Suggested direction:
 
 - treat `generalization_obs_v1` as the new baseline for future work
 - use `docs/COMPETITION_NOTES.md` whenever a simulator assumption needs to be compared against the real competition interface
+- use `caffeinate -dimsu -w <train_all_pid>` on macOS during long runs, because sleep/shutdown does not auto-restart training
 - keep any claim about highlighted gates, no-depth guarantees, or control abstraction tagged as historical unless the latest spec confirms it
 - use the observation-upgrade result as a key storyline in the report and portfolio because it is still the clearest architectural win so far
 

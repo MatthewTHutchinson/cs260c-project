@@ -228,6 +228,9 @@ class PPOTrainer:
         self._best_val_stats = None
         self._val_metric_placeholders = self._build_val_metric_placeholders()
 
+    def _resume_state_path(self, out_dir: str) -> str:
+        return os.path.join(out_dir, "trainer_state_latest.pt")
+
     def _build_val_metric_placeholders(self) -> dict[str, float]:
         if not self.val_envs:
             return {}
@@ -243,6 +246,45 @@ class PPOTrainer:
         for key in _EVAL_STAT_KEYS:
             placeholders[f"val_mix_{key}"] = np.nan
         return placeholders
+
+    def save_resume_state(self, out_dir: str, steps: int, update_idx: int, all_metrics: list[dict]) -> None:
+        state = {
+            "model_state": self.policy.state_dict(),
+            "optimizer_state": self.optimizer.state_dict(),
+            "steps": int(steps),
+            "update_idx": int(update_idx),
+            "global_step": int(self._global_step),
+            "best_val_score": self._best_val_score,
+            "best_val_stats": self._best_val_stats,
+            "clip_radius": float(self.env.clip_radius),
+            "all_metrics": all_metrics,
+        }
+        torch.save(state, self._resume_state_path(out_dir))
+
+    def load_resume_state(self, out_dir: str) -> tuple[int, int, list[dict]]:
+        path = self._resume_state_path(out_dir)
+        if not os.path.exists(path):
+            print(f"[PPO] Resume requested but no trainer state found at {path}; starting fresh.")
+            return 0, 0, []
+
+        state = torch.load(path, map_location=self.device)
+        self.policy.load_state_dict(state["model_state"])
+        self.optimizer.load_state_dict(state["optimizer_state"])
+        steps = int(state.get("steps", 0))
+        update_idx = int(state.get("update_idx", 0))
+        self._global_step = int(state.get("global_step", steps))
+        self._update_idx = update_idx
+        self._best_val_score = state.get("best_val_score")
+        self._best_val_stats = state.get("best_val_stats")
+        resume_clip = float(state.get("clip_radius", self.env.clip_radius))
+        self.env.set_clip_radius(resume_clip)
+        self._obs, _ = self.env.reset(seed=self.validation_seed + update_idx * 1000)
+        all_metrics = list(state.get("all_metrics", []))
+        print(
+            f"[PPO] Resume: restored update {update_idx} at step {steps} "
+            f"with clip_radius={resume_clip:.2f}"
+        )
+        return steps, update_idx, all_metrics
 
     def collect_rollout(self) -> tuple[torch.Tensor, dict]:
         self.policy.eval()
@@ -419,12 +461,15 @@ class PPOTrainer:
         })
         return metrics, agg, per_suite
 
-    def train(self, out_dir: str) -> str:
+    def train(self, out_dir: str, resume: bool = False) -> str:
         os.makedirs(out_dir, exist_ok=True)
-        steps      = 0
-        update_idx = 0
-        all_metrics: list[dict] = []
         best_ckpt = os.path.join(out_dir, "policy_ppo_best.pt")
+        if resume:
+            steps, update_idx, all_metrics = self.load_resume_state(out_dir)
+        else:
+            steps = 0
+            update_idx = 0
+            all_metrics = []
 
         while steps < self.total_steps:
             # --- Curriculum: update clip_radius ---
@@ -457,6 +502,7 @@ class PPOTrainer:
 
             merged_metrics["best_ckpt_improved"] = 1.0 if improved else 0.0
             all_metrics.append(merged_metrics)
+            self.save_resume_state(out_dir, steps, update_idx, all_metrics)
 
             if self.checkpoint_interval > 0 and update_idx % self.checkpoint_interval == 0:
                 print(
@@ -533,6 +579,8 @@ def main():
     parser.add_argument("--dagger-ckpt",  default="logs/dagger/policy_dagger.pt")
     parser.add_argument("--dagger-data",  default="logs/dagger")
     parser.add_argument("--out",          default="logs/ppo")
+    parser.add_argument("--resume",       action="store_true",
+                        help="Resume PPO from logs/<run>/trainer_state_latest.pt if it exists.")
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -612,7 +660,7 @@ def main():
         bc_imgs = torch.from_numpy(np.load(img_path))
 
     trainer    = PPOTrainer(env, policy, cfg, bc_obs, bc_acts, bc_imgs, device, val_envs=val_envs)
-    final_ckpt = trainer.train(args.out)
+    final_ckpt = trainer.train(args.out, resume=args.resume)
     env.close()
     for _, val_env, _ in val_envs:
         val_env.close()

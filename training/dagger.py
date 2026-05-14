@@ -12,7 +12,9 @@ Usage
 """
 
 import argparse
+import json
 import os
+import re
 import numpy as np
 import torch
 import yaml
@@ -22,6 +24,60 @@ from expert.expert_policy import ExpertPolicy
 from policy.actor import build_deterministic_policy, policy_uses_images
 from policy.runtime import get_env_image, image_batch_to_tensor, obs_batch_to_tensor, policy_act, policy_forward
 from training.bc import build_state_teacher, dataset_to_tensors, train_bc
+
+_ROUND_RE = re.compile(r"policy_dagger_r(\d+)\.pt$")
+
+
+def _round_ckpt_path(out_dir: str, round_idx: int) -> str:
+    return os.path.join(out_dir, f"policy_dagger_r{round_idx:02d}.pt")
+
+
+def _resume_meta_path(out_dir: str) -> str:
+    return os.path.join(out_dir, "resume_meta.json")
+
+
+def _resume_obs_path(out_dir: str) -> str:
+    return os.path.join(out_dir, "resume_dataset_obs.npy")
+
+
+def _resume_act_path(out_dir: str) -> str:
+    return os.path.join(out_dir, "resume_dataset_act.npy")
+
+
+def _resume_img_path(out_dir: str) -> str:
+    return os.path.join(out_dir, "resume_dataset_img.npy")
+
+
+def _resume_losses_path(out_dir: str) -> str:
+    return os.path.join(out_dir, "resume_dagger_losses.npy")
+
+
+def _latest_completed_round(out_dir: str) -> int:
+    latest = 0
+    if not os.path.isdir(out_dir):
+        return latest
+    for name in os.listdir(out_dir):
+        match = _ROUND_RE.fullmatch(name)
+        if match:
+            latest = max(latest, int(match.group(1)))
+    return latest
+
+
+def _save_resume_state(
+    out_dir: str,
+    completed_rounds: int,
+    obs_agg: np.ndarray,
+    act_agg: np.ndarray,
+    img_agg: np.ndarray | None,
+    all_losses: list[float],
+) -> None:
+    np.save(_resume_obs_path(out_dir), obs_agg)
+    np.save(_resume_act_path(out_dir), act_agg)
+    if img_agg is not None:
+        np.save(_resume_img_path(out_dir), img_agg)
+    np.save(_resume_losses_path(out_dir), np.array(all_losses, dtype=np.float32))
+    with open(_resume_meta_path(out_dir), "w") as f:
+        json.dump({"completed_rounds": int(completed_rounds)}, f)
 
 
 def rollout_policy(
@@ -72,6 +128,8 @@ def main():
     parser.add_argument("--bc-data", default="logs/bc")
     parser.add_argument("--out", default="logs/dagger")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--resume", action="store_true",
+                        help="Resume from the latest completed DAgger round if resume artifacts exist.")
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -96,9 +154,6 @@ def main():
             raise ValueError(
                 f"policy.image_shape={cfg_image_shape} does not match env image shape {env_image_shape}"
             )
-    policy = build_deterministic_policy(policy_cfg, obs_dim=obs_dim)
-    policy.load(args.bc_ckpt, device=device)
-
     distill_teacher = None
     distill_coef = float(policy_cfg.get("distill_coef", 0.0))
     distill_ckpt = policy_cfg.get("distill_teacher_ckpt")
@@ -114,24 +169,53 @@ def main():
         print(f"[DAgger] Distilling from state teacher with coef={distill_coef:.3f}")
 
     dagger_cfg = cfg["dagger"]
+    policy = build_deterministic_policy(policy_cfg, obs_dim=obs_dim)
 
-    # Load BC dataset as the initial aggregate dataset
-    obs_agg = np.load(os.path.join(args.bc_data, "dataset_obs.npy"))
-    act_agg = np.load(os.path.join(args.bc_data, "dataset_act.npy"))
+    start_round = 0
+    all_losses: list[float] = []
+    obs_agg = None
+    act_agg = None
     img_agg = None
     img_path = os.path.join(args.bc_data, "dataset_img.npy")
-    if collect_images:
-        if not os.path.exists(img_path):
-            raise FileNotFoundError(
-                f"Expected multimodal BC dataset at {img_path}, but it was not found."
-            )
-        img_agg = np.load(img_path)
-        if img_agg.ndim == 4 and img_agg.shape[-1] == 3:
-            img_agg = np.transpose(img_agg, (0, 3, 1, 2))
-    print(f"[DAgger] Initial dataset size: {len(obs_agg)}")
 
-    all_losses = []
-    for rnd in range(dagger_cfg["n_rounds"]):
+    latest_round = _latest_completed_round(args.out) if args.resume else 0
+    resume_ready = (
+        latest_round > 0
+        and os.path.exists(_resume_obs_path(args.out))
+        and os.path.exists(_resume_act_path(args.out))
+        and os.path.exists(_round_ckpt_path(args.out, latest_round))
+    )
+    if collect_images:
+        resume_ready = resume_ready and os.path.exists(_resume_img_path(args.out))
+
+    if resume_ready:
+        policy.load(_round_ckpt_path(args.out, latest_round), device=device)
+        obs_agg = np.load(_resume_obs_path(args.out))
+        act_agg = np.load(_resume_act_path(args.out))
+        if collect_images:
+            img_agg = np.load(_resume_img_path(args.out))
+        if os.path.exists(_resume_losses_path(args.out)):
+            all_losses = np.load(_resume_losses_path(args.out)).tolist()
+        start_round = latest_round
+        print(f"[DAgger] Resume: continuing from round {latest_round}/{dagger_cfg['n_rounds']}")
+        print(f"[DAgger] Resume dataset size: {len(obs_agg)}")
+    else:
+        if args.resume and latest_round > 0:
+            print("[DAgger] Resume artifacts were incomplete; restarting DAgger from BC checkpoint.")
+        policy.load(args.bc_ckpt, device=device)
+        obs_agg = np.load(os.path.join(args.bc_data, "dataset_obs.npy"))
+        act_agg = np.load(os.path.join(args.bc_data, "dataset_act.npy"))
+        if collect_images:
+            if not os.path.exists(img_path):
+                raise FileNotFoundError(
+                    f"Expected multimodal BC dataset at {img_path}, but it was not found."
+                )
+            img_agg = np.load(img_path)
+            if img_agg.ndim == 4 and img_agg.shape[-1] == 3:
+                img_agg = np.transpose(img_agg, (0, 3, 1, 2))
+        print(f"[DAgger] Initial dataset size: {len(obs_agg)}")
+
+    for rnd in range(start_round, dagger_cfg["n_rounds"]):
         print(f"\n[DAgger] Round {rnd + 1}/{dagger_cfg['n_rounds']}")
 
         new_obs, new_acts, new_imgs = rollout_policy(
@@ -166,6 +250,7 @@ def main():
 
         ckpt = os.path.join(args.out, f"policy_dagger_r{rnd + 1:02d}.pt")
         policy.save(ckpt)
+        _save_resume_state(args.out, rnd + 1, obs_agg, act_agg, img_agg, all_losses)
 
     final_ckpt = os.path.join(args.out, "policy_dagger.pt")
     policy.save(final_ckpt)

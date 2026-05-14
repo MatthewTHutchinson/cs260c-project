@@ -224,6 +224,14 @@ Expert outputs same action space as learner (body-frame delta).
   `configs/competition_spec_multimodal_eval.yaml`.
 - `env/dcl_adapter.py` now fails fast instead of silently returning zero telemetry / fake observations.
   It is still a scaffold, not a working competition client.
+- Training is now more restart-friendly:
+  `train_all.py --resume` skips completed BC/DAgger/PPO stages when artifacts already exist,
+  DAgger persists `resume_dataset_*.npy` plus per-round checkpoints,
+  and PPO writes `trainer_state_latest.pt` for update-level restart.
+- On macOS, use:
+  `caffeinate -dimsu -w <train_all_pid>`
+  during long runs.
+  This prevents idle sleep, but not shutdown, reboot, or closing the lid.
 
 ## Notes for future Claude sessions
 - For external AI Grand Prix / DCL facts, start with:
