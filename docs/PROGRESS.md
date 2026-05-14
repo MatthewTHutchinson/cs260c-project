@@ -51,6 +51,33 @@ Current status:
   `train_all.py --resume` skips completed stages,
   DAgger saves round-level resume artifacts,
   and PPO writes `trainer_state_latest.pt` for update-level restart.
+- New benchmark extension is now in place:
+  mirrored/right-turn held-out tracks and longer `6`-gate held-out tracks exist in
+  `env/tracks.py`,
+  with a focused audit config at
+  `configs/extended_generalization_obs_eval.yaml`.
+- Result:
+  the current strongest state-based champion
+  `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`
+  is clearly weaker on mirrored/right-turn behavior and longer courses than on the original held-out suite.
+  On the extended audit it reached:
+  `legacy_core` essentially strong throughout,
+  but `heldout_right_lowhigh` dropped to `75%` completion,
+  and the long-course family was mixed to poor:
+  `heldout_long_hex` `0%`,
+  `heldout_long_hex_right` `100%`,
+  `heldout_long_snake` `0%`,
+  `heldout_long_snake_right` `0%`.
+- Important interpretation:
+  this confirms the repo had a meaningful directional/topology blind spot,
+  not just a visualization concern.
+- Expert update:
+  `expert/expert_policy.py` now uses a longer-horizon blend over future gates instead of only the next two turns.
+  That improved the expert substantially on mirrored/right-turn tracks and on the `long_hex` family,
+  but `long_snake` remains a stretch case rather than a good current imitation target.
+- Prepared next branch:
+  `configs/generalization_bidirectional_obs_v1.yaml`
+  extends the richer-state training distribution with mirrored/right-turn and solvable longer-course tracks.
 
 ## Immediate next step
 
@@ -59,6 +86,7 @@ Finish `multimodal_obs_v2`, then compare it against:
 - `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`
 - `logs/ppo_multimodal_obs_v1/policy_ppo_best.pt`
 - the new competition-spec multimodal evaluation config
+- the new directional / longer-course audit
 
 Update:
 
@@ -88,6 +116,7 @@ Suggested direction:
 - use `caffeinate -dimsu -w <train_all_pid>` on macOS during long runs, because sleep/shutdown does not auto-restart training
 - keep any claim about highlighted gates, no-depth guarantees, or control abstraction tagged as historical unless the latest spec confirms it
 - use the observation-upgrade result as a key storyline in the report and portfolio because it is still the clearest architectural win so far
+- use the new extended audit before claiming broad robustness; the older held-out suite alone is no longer enough
 
 ## What to record after each run
 
@@ -127,6 +156,36 @@ Suggested direction:
 - Objectivity policy:
   facts are now split into `Confirmed`, `Historical`, and `Inference` buckets.
 - Takeaway:
+### Run: `extended_directional_longcourse_audit`
+
+- Date: 2026-05-14
+- Goal:
+  test whether the current strongest richer-state PPO policy generalizes beyond the original mostly left-turn 4-gate family,
+  especially to mirrored/right-turn layouts and longer `6`-gate courses.
+- New assets:
+  added new named tracks in `env/tracks.py`,
+  added focused audit config `configs/extended_generalization_obs_eval.yaml`,
+  and prepared future training config `configs/generalization_bidirectional_obs_v1.yaml`.
+- State-champion result:
+  `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`
+  remained strong on `legacy_core`,
+  but weakened noticeably on mirrored/right-turn tracks and failed most longer-course tracks.
+  Representative results:
+  `heldout_right_lowhigh` `75%` completion,
+  `heldout_long_hex` `0%`,
+  `heldout_long_hex_right` `100%`,
+  `heldout_long_snake` `0%`,
+  `heldout_long_snake_right` `0%`.
+- Interpretation:
+  the old benchmark had been hiding a real directional/topology blind spot.
+  The policy was not simply "a bit conservative"; it was substantially less reliable once the course family changed.
+- Expert follow-up:
+  upgraded `expert/expert_policy.py` to use a longer-horizon future-gate blend.
+  The improved expert now succeeds on mirrored/right-turn held-outs and partially recovers the `long_hex` family,
+  but still fails the `long_snake` family.
+- Practical outcome:
+  treat `long_snake` as a stretch audit family for now,
+  and use `generalization_bidirectional_obs_v1.yaml` as the next state-training branch after the active multimodal run.
   the project now has a much cleaner separation between
   what the latest spec really says,
   what came from older emails,

@@ -361,6 +361,12 @@ class GateRaceAviary(BaseAviary):
             return None
         return self._last_camera_frame.copy()
 
+    def get_last_camera_detections(self) -> list:
+        return list(self._last_camera_detections)
+
+    def get_last_detection_confidences(self) -> np.ndarray:
+        return self._last_detection_confidences.copy()
+
     def render_onboard_camera(self) -> Optional[np.ndarray]:
         return self._render_onboard_camera()
 

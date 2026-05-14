@@ -278,6 +278,40 @@ Quick visualization presets:
 /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.visualize --preset multimodal_v2_bc
 ```
 
+Inspect the onboard camera input and detector overlay side by side:
+
+```bash
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.visualize_perception --preset multimodal_v1
+```
+
+Save debug frames without opening an OpenCV window:
+
+```bash
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.visualize_perception \
+  --preset multimodal_v1 \
+  --no-window \
+  --save-dir logs/perception_debug_multimodal_v1
+```
+
+Run the extended directional / longer-course audit on the current state champion:
+
+```bash
+KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.evaluate_track_suite \
+  --config configs/extended_generalization_obs_eval.yaml \
+  --type ppo \
+  --ckpt logs/ppo_generalization_obs_v1/policy_ppo_best.pt
+```
+
+Prepared next state-training branch for mirrored/right-turn plus longer-course generalization:
+
+```bash
+KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python train_all.py \
+  --config configs/generalization_bidirectional_obs_v1.yaml \
+  --bc-out logs/bc_generalization_bidirectional_obs_v1 \
+  --dagger-out logs/dagger_generalization_bidirectional_obs_v1 \
+  --ppo-out logs/ppo_generalization_bidirectional_obs_v1
+```
+
 ## Documentation workflow
 
 Use these files as the shared documentation backbone:

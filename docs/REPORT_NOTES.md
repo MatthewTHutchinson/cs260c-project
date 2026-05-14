@@ -166,6 +166,17 @@ A staged imitation-to-RL pipeline is a practical way to bootstrap autonomous dro
   That means the multimodal result is encouraging, but it is not yet a clean new champion claim.
 - The new `docs/COMPETITION_NOTES.md` file is useful report scaffolding in its own right,
   because it cleanly separates latest-spec facts from older email assumptions and repo-side inferences.
+- A new extended audit now makes the robustness story more honest:
+  once mirrored/right-turn and longer `6`-gate tracks were added,
+  the current stronger state-based champion no longer looked uniformly robust.
+  It stayed strong on the old held-out family,
+  but degraded on mirrored/right-turn layouts and failed most of the harder longer-course family.
+- This is important report material because it shows the earlier benchmark was directionally informative but incomplete.
+  The project did not "solve racing" in a broad sense;
+  it solved a narrower but still meaningful family of simulator courses.
+- The mirrored/right-turn gap appears to be a real policy-generalization issue.
+  By contrast, some of the longer-course failures also exposed a limitation in the heuristic expert,
+  which is why the expert was upgraded to use a longer future-gate blend before scheduling the next bidirectional training branch.
 - Operationally, long-running laptop training needed explicit resilience work:
   the repo now supports stage-aware `train_all.py --resume`,
   round-level DAgger resume,

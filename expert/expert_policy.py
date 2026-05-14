@@ -1,8 +1,8 @@
 """Lookahead expert policy for gate racing.
 
-Targets a point slightly beyond the next gate while blending in the next
-two gate directions and normals, so the expert begins setting up the
-turn earlier than a pure gate-center chaser.
+Targets a point slightly beyond the next gate while blending future gate
+directions and normals, so the expert begins setting up the turn earlier
+than a pure gate-center chaser and handles longer courses better.
 """
 
 import numpy as np
@@ -14,7 +14,7 @@ class ExpertPolicy:
 
     At each step the expert reads the current environment state, computes
     a target point just beyond the next gate plane while anticipating the
-    next two turns, and converts that world-frame target into the same
+    next several turns, and converts that world-frame target into the same
     normalised body-frame waypoint-delta action used by the learner.
     """
 
@@ -60,26 +60,47 @@ class ExpertPolicy:
         return np.array([*action_xyz, action_yaw], dtype=np.float32)
 
 
-def _lookahead_target(gates: list[dict], next_gate_idx: int) -> tuple[np.ndarray, np.ndarray]:
-    """Return a target point and desired heading direction for the expert."""
-    g0 = gates[next_gate_idx % len(gates)]
-    g1 = gates[(next_gate_idx + 1) % len(gates)]
-    g2 = gates[(next_gate_idx + 2) % len(gates)]
+def _lookahead_target(gates: list[dict], next_gate_idx: int, horizon: int = 4) -> tuple[np.ndarray, np.ndarray]:
+    """Return a target point and desired heading direction for the expert.
 
-    seg01 = _safe_unit(g1["center"] - g0["center"], g0["normal"])
-    seg12 = _safe_unit(g2["center"] - g1["center"], g1["normal"])
+    The target is built from the next gate's pass-through normal plus a
+    decaying blend of upcoming segment directions and gate normals.
+    That makes the expert less tied to simple 4-gate loops and gives it a
+    longer planning horizon on 5- to 6-gate courses.
+    """
+    horizon = max(3, min(int(horizon), len(gates)))
+    future = [gates[(next_gate_idx + i) % len(gates)] for i in range(horizon)]
+    g0 = future[0]
 
-    exit_dir = _safe_unit(
-        1.8 * g0["normal"] + 0.9 * seg01 + 0.45 * seg12 + 0.35 * g1["normal"],
-        g0["normal"],
-    )
-    lateral_hint = seg01 - np.dot(seg01, g0["normal"]) * g0["normal"]
+    seg_dirs = [
+        _safe_unit(future[i + 1]["center"] - future[i]["center"], future[i]["normal"])
+        for i in range(len(future) - 1)
+    ]
+
+    blended = 1.7 * g0["normal"]
+    for idx, seg in enumerate(seg_dirs):
+        blended += (0.95 * (0.62 ** idx)) * seg
+    for idx, gate in enumerate(future[1:]):
+        blended += (0.45 * (0.55 ** idx)) * gate["normal"]
+    exit_dir = _safe_unit(blended, g0["normal"])
+
+    path_dir = _safe_unit(sum((0.85 * (0.65 ** idx)) * seg for idx, seg in enumerate(seg_dirs)), g0["normal"])
+    lateral_hint = path_dir - np.dot(path_dir, g0["normal"]) * g0["normal"]
     lateral_hint = _safe_unit(lateral_hint, np.zeros(3))
+
+    straightness = 0.0
+    if len(seg_dirs) >= 2:
+        straightness = float(np.clip(np.dot(seg_dirs[0], seg_dirs[1]), -1.0, 1.0))
+    gate_scale = float(g0.get("radius", 0.75)) / 0.75
+    pass_offset = gate_scale * (0.28 + 0.08 * max(0.0, straightness))
+    lateral_offset = gate_scale * (0.10 + 0.10 * (1.0 - max(0.0, straightness)))
+    cruise_bonus = 0.10 * gate_scale * max(0.0, straightness)
 
     target_world = (
         g0["center"].copy()
-        + exit_dir * 0.32
-        + lateral_hint * 0.12
+        + exit_dir * pass_offset
+        + lateral_hint * lateral_offset
+        + path_dir * cruise_bonus
     )
     return target_world, exit_dir
 

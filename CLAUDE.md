@@ -232,6 +232,18 @@ Expert outputs same action space as learner (body-frame delta).
   `caffeinate -dimsu -w <train_all_pid>`
   during long runs.
   This prevents idle sleep, but not shutdown, reboot, or closing the lid.
+- There is now a stronger generalization audit beyond the old held-out suite:
+  `configs/extended_generalization_obs_eval.yaml`
+  tests mirrored/right-turn tracks plus longer `6`-gate courses.
+- That audit exposed a real blind spot in the current state champion:
+  it is still strong on the legacy held-out family,
+  but it weakens on mirrored/right-turn tracks and fails most longer-course tracks.
+- `expert/expert_policy.py` has been upgraded to use a longer-horizon future-gate blend.
+  This improved mirrored/right-turn and `long_hex` behavior,
+  but `long_snake` remains a stretch audit family rather than a good current imitation target.
+- Prepared next state-training branch:
+  `configs/generalization_bidirectional_obs_v1.yaml`
+  for richer-state training on mirrored/right-turn plus solvable longer-course layouts.
 
 ## Notes for future Claude sessions
 - For external AI Grand Prix / DCL facts, start with:
