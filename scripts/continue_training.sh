@@ -37,7 +37,7 @@ log() {
 
 wait_for_active_multimodal() {
   local pid
-  pid="$(ps -Ao pid,command | awk '/train_all.py --config configs\/multimodal_obs_v2.yaml/ && $0 !~ /awk/ {print $1; exit}')"
+  pid="$(pgrep -f "train_all.py --config ${MULTI_CFG}" | head -n 1 || true)"
   if [[ -n "${pid:-}" ]]; then
     log "Detected active multimodal_obs_v2 run (PID $pid). Waiting for it to finish..."
     while kill -0 "$pid" 2>/dev/null; do
