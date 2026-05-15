@@ -312,6 +312,18 @@ KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-projec
   --ppo-out logs/ppo_generalization_bidirectional_obs_v1
 ```
 
+Continue training automatically after the active `multimodal_obs_v2` run:
+
+```bash
+nohup zsh scripts/continue_training.sh > logs/continue_training.log 2>&1 &
+```
+
+That script will:
+- wait for `multimodal_obs_v2` to finish if it is still active
+- resume `multimodal_obs_v2` if it exited before writing `policy_ppo_best.pt`
+- evaluate the finished multimodal PPO checkpoint on the standard and competition-spec suites
+- launch `generalization_bidirectional_obs_v1` with `--resume`
+
 ## Documentation workflow
 
 Use these files as the shared documentation backbone:

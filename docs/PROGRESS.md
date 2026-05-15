@@ -78,6 +78,22 @@ Current status:
 - Prepared next branch:
   `configs/generalization_bidirectional_obs_v1.yaml`
   extends the richer-state training distribution with mirrored/right-turn and solvable longer-course tracks.
+- Active multimodal follow-up status:
+  `multimodal_obs_v2` is still running in DAgger.
+  A quick sanity check of the latest saved checkpoint
+  `logs/dagger_multimodal_obs_v2/policy_dagger_r03.pt`
+  on the original multimodal held-out suite gave:
+  `100%` completion,
+  `0%` crash,
+  mean gates `4.61`,
+  mean return `77.34`.
+  That is a good sign that the teacher-warmstarted multimodal branch is still worth finishing rather than abandoning early.
+- Continuation automation is now in place:
+  `scripts/continue_training.sh`
+  waits for the active multimodal run,
+  resumes it if needed,
+  evaluates the finished PPO checkpoint,
+  and then launches `generalization_bidirectional_obs_v1`.
 
 ## Immediate next step
 
@@ -186,6 +202,24 @@ Suggested direction:
 - Practical outcome:
   treat `long_snake` as a stretch audit family for now,
   and use `generalization_bidirectional_obs_v1.yaml` as the next state-training branch after the active multimodal run.
+
+### Run: `multimodal_obs_v2_midrun_sanity`
+
+- Date: 2026-05-15
+- Goal:
+  confirm that the still-running `multimodal_obs_v2` branch is trending well enough to justify continuing it before launching the next state branch.
+- Checkpoint tested:
+  `logs/dagger_multimodal_obs_v2/policy_dagger_r03.pt`
+- Config:
+  `configs/multimodal_obs_v2.yaml`
+- Result on the original multimodal held-out suite:
+  aggregate completion `100%`,
+  crash `0%`,
+  mean gates `4.61`,
+  mean return `77.34`.
+- Interpretation:
+  the teacher-warmstarted multimodal branch is still on track on the original held-out family,
+  even though the broader directional/long-course benchmark shows the project still needs a stronger next state branch.
   the project now has a much cleaner separation between
   what the latest spec really says,
   what came from older emails,
