@@ -93,7 +93,11 @@ Current status:
   waits for the active multimodal run,
   resumes it if needed,
   evaluates the finished PPO checkpoint,
-  and then launches `generalization_bidirectional_obs_v1`.
+  launches `generalization_bidirectional_obs_v1`,
+  and evaluates the finished bidirectional state branch too.
+- Supporting status helper:
+  `scripts/training_status.sh`
+  now prints active run processes, latest checkpoint artifacts, and the continuation log.
 
 ## Immediate next step
 
@@ -220,6 +224,26 @@ Suggested direction:
 - Interpretation:
   the teacher-warmstarted multimodal branch is still on track on the original held-out family,
   even though the broader directional/long-course benchmark shows the project still needs a stronger next state branch.
+
+### Run: `multimodal_extended_audit_setup`
+
+- Date: 2026-05-15
+- Goal:
+  make the multimodal branch answerable to the same harder mirrored/right-turn and longer-course benchmark as the state branch,
+  instead of only the older held-out suite.
+- New assets:
+  `configs/extended_generalization_multimodal_eval.yaml`
+  plus updates to
+  `scripts/continue_training.sh`
+  and
+  `scripts/training_status.sh`.
+- Purpose:
+  once `multimodal_obs_v2` reaches PPO,
+  we should be able to compare it on:
+  the original multimodal held-out family,
+  the competition-spec multimodal family,
+  and the new extended multimodal directional/long-course family
+  without manual one-off commands.
   the project now has a much cleaner separation between
   what the latest spec really says,
   what came from older emails,

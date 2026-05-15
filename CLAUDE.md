@@ -248,12 +248,20 @@ Expert outputs same action space as learner (body-frame delta).
   wait for `multimodal_obs_v2`,
   resume it if needed,
   evaluate the finished multimodal PPO checkpoint,
-  then launch `generalization_bidirectional_obs_v1`.
+  launch `generalization_bidirectional_obs_v1`,
+  then evaluate the finished bidirectional state branch.
 - Mid-run sanity signal:
   `logs/dagger_multimodal_obs_v2/policy_dagger_r03.pt`
   reached `100%` completion and mean return `77.34`
   on the original multimodal held-out suite,
   so the active multimodal run is still worth finishing.
+- There is now a matching harder multimodal audit config:
+  `configs/extended_generalization_multimodal_eval.yaml`
+  so the multimodal branch can be tested on mirrored/right-turn and longer-course layouts,
+  not just the original multimodal held-out family.
+- `scripts/training_status.sh` prints the current active processes,
+  latest checkpoint artifacts,
+  and continuation-log tail for long-run monitoring.
 
 ## Notes for future Claude sessions
 - For external AI Grand Prix / DCL facts, start with:

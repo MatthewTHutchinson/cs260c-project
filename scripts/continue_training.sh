@@ -9,6 +9,7 @@ export KMP_DUPLICATE_LIB_OK=TRUE
 
 LOG_DIR="$ROOT_DIR/logs"
 mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/continue_training.log"
 
 MULTI_CFG="configs/multimodal_obs_v2.yaml"
 MULTI_BC="logs/bc_multimodal_obs_v2"
@@ -20,13 +21,18 @@ BIDIR_CFG="configs/generalization_bidirectional_obs_v1.yaml"
 BIDIR_BC="logs/bc_generalization_bidirectional_obs_v1"
 BIDIR_DAG="logs/dagger_generalization_bidirectional_obs_v1"
 BIDIR_PPO="logs/ppo_generalization_bidirectional_obs_v1"
+BIDIR_BEST="$BIDIR_PPO/policy_ppo_best.pt"
 
 timestamp() {
   date "+%Y-%m-%d %H:%M:%S"
 }
 
 log() {
-  echo "[$(timestamp)] $*"
+  local line="[$(timestamp)] $*"
+  echo "$line"
+  if [[ -n "${LOG_FILE:-}" ]]; then
+    echo "$line" >> "$LOG_FILE"
+  fi
 }
 
 wait_for_active_multimodal() {
@@ -79,6 +85,14 @@ evaluate_multimodal_if_ready() {
     --ckpt "$MULTI_BEST" \
     --episodes 8 \
     | tee "$MULTI_PPO/eval_competition_spec_suite.txt"
+
+  log "Evaluating multimodal_obs_v2 best checkpoint on extended directional/long-course multimodal suite."
+  "$PYTHON" -m eval.evaluate_track_suite \
+    --config configs/extended_generalization_multimodal_eval.yaml \
+    --type ppo \
+    --ckpt "$MULTI_BEST" \
+    --episodes 8 \
+    | tee "$MULTI_PPO/eval_extended_generalization_suite.txt"
 }
 
 launch_bidirectional_branch() {
@@ -87,8 +101,8 @@ launch_bidirectional_branch() {
     return 0
   fi
 
-  if [[ -f "$BIDIR_PPO/policy_ppo_best.pt" ]]; then
-    log "Bidirectional branch already has a PPO best checkpoint at $BIDIR_PPO/policy_ppo_best.pt"
+  if [[ -f "$BIDIR_BEST" ]]; then
+    log "Bidirectional branch already has a PPO best checkpoint at $BIDIR_BEST"
     return 0
   fi
 
@@ -101,12 +115,36 @@ launch_bidirectional_branch() {
     --resume
 }
 
+evaluate_bidirectional_if_ready() {
+  if [[ ! -f "$BIDIR_BEST" ]]; then
+    log "Skipping bidirectional evaluation because $BIDIR_BEST is still missing."
+    return 0
+  fi
+
+  log "Evaluating bidirectional branch on the extended directional/long-course suite."
+  "$PYTHON" -m eval.evaluate_track_suite \
+    --config configs/extended_generalization_obs_eval.yaml \
+    --type ppo \
+    --ckpt "$BIDIR_BEST" \
+    --episodes 8 \
+    | tee "$BIDIR_PPO/eval_extended_generalization_suite.txt"
+
+  log "Evaluating bidirectional branch on the legacy richer-state suite."
+  "$PYTHON" -m eval.evaluate_track_suite \
+    --config configs/generalization_obs_v1.yaml \
+    --type ppo \
+    --ckpt "$BIDIR_BEST" \
+    --episodes 8 \
+    | tee "$BIDIR_PPO/eval_legacy_suite.txt"
+}
+
 main() {
   log "continue_training.sh starting"
   wait_for_active_multimodal
   resume_multimodal_if_needed
   evaluate_multimodal_if_ready
   launch_bidirectional_branch
+  evaluate_bidirectional_if_ready
   log "continue_training.sh finished"
 }
 

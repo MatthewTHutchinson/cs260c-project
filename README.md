@@ -322,7 +322,15 @@ That script will:
 - wait for `multimodal_obs_v2` to finish if it is still active
 - resume `multimodal_obs_v2` if it exited before writing `policy_ppo_best.pt`
 - evaluate the finished multimodal PPO checkpoint on the standard and competition-spec suites
+- evaluate the finished multimodal PPO checkpoint on the new extended multimodal directional/long-course suite
 - launch `generalization_bidirectional_obs_v1` with `--resume`
+- evaluate the finished bidirectional state PPO checkpoint on the extended and legacy richer-state suites
+
+Check long-run training status quickly:
+
+```bash
+zsh scripts/training_status.sh
+```
 
 ## Documentation workflow
 
