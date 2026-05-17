@@ -37,7 +37,7 @@ summarize_dir() {
 }
 
 print_section "Active Processes"
-ps -Ao pid,etime,%cpu,%mem,command | rg 'multimodal_obs_v2|generalization_bidirectional_obs_v1|continue_training.sh|training\.(bc|dagger|ppo)|train_all.py' || true
+ps -Ao pid,etime,%cpu,%mem,command | rg 'multimodal_obs_v2|generalization_bidirectional_obs_v1|generalization_speed_v1|continue_training.sh|training\.(bc|dagger|ppo)|train_all.py' || true
 
 print_section "Checkpoint Directories"
 summarize_dir "multimodal v2 BC" "logs/bc_multimodal_obs_v2"
@@ -46,6 +46,9 @@ summarize_dir "multimodal v2 PPO" "logs/ppo_multimodal_obs_v2"
 summarize_dir "bidirectional BC" "logs/bc_generalization_bidirectional_obs_v1"
 summarize_dir "bidirectional DAgger" "logs/dagger_generalization_bidirectional_obs_v1"
 summarize_dir "bidirectional PPO" "logs/ppo_generalization_bidirectional_obs_v1"
+summarize_dir "speed BC" "logs/bc_generalization_speed_v1"
+summarize_dir "speed DAgger" "logs/dagger_generalization_speed_v1"
+summarize_dir "speed PPO" "logs/ppo_generalization_speed_v1"
 
 print_section "Continuation Log"
 if [[ -f logs/continue_training.log ]]; then

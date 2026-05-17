@@ -64,6 +64,17 @@ Visualize the expert:
 /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.visualize --type expert
 ```
 
+Render a presentation-ready MP4 demo clip:
+
+```bash
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m eval.render_demo_video \
+  --preset state_champion \
+  --output logs/presentation/state_champion_demo.mp4 \
+  --episodes 1 \
+  --force-visuals \
+  --shadow
+```
+
 Run the full training pipeline:
 
 ```bash
@@ -248,6 +259,16 @@ KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-projec
   --bc-out logs/bc_multimodal_obs_v2 \
   --dagger-out logs/dagger_multimodal_obs_v2 \
   --ppo-out logs/ppo_multimodal_obs_v2
+```
+
+Train the first position-plus-velocity speed branch:
+
+```bash
+KMP_DUPLICATE_LIB_OK=TRUE /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python train_all.py \
+  --config configs/generalization_speed_v1.yaml \
+  --bc-out logs/bc_generalization_speed_v1 \
+  --dagger-out logs/dagger_generalization_speed_v1 \
+  --ppo-out logs/ppo_generalization_speed_v1
 ```
 
 Resume an interrupted run from the latest completed stage and saved trainer state:

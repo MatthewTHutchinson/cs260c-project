@@ -21,6 +21,11 @@ A staged imitation-to-RL pipeline is a practical way to bootstrap autonomous dro
   body-frame velocity, angular rates, and relative gate geometry in the body frame
 - Action:
   body-frame waypoint delta plus yaw delta
+- Control abstraction caveat:
+  the waypoint delta is a repo-side learning abstraction, not a confirmed competition command.
+  In PyBullet it becomes a nearby position target for the PID controller.
+  A competition-facing adapter should likely map it into `SET_POSITION_TARGET_LOCAL_NED`
+  first as position setpoints, then as position setpoints with velocity feedforward.
 - Environment:
   custom gate events on top of `gym-pybullet-drones`
 - Reward:
@@ -60,6 +65,10 @@ A staged imitation-to-RL pipeline is a practical way to bootstrap autonomous dro
   so the old control wording should be treated as preliminary rather than authoritative.
 - The repo does not yet implement the final DCL MAVLink / UDP client path end to end, so do not overstate competition readiness.
 - The DCL adapter file is now explicitly fail-fast rather than silently behaving like a working client.
+- The current waypoint-delta action is not the final MAVLink interface.
+  The latest spec confirms `SET_POSITION_TARGET_LOCAL_NED` and `SET_ATTITUDE_TARGET`,
+  so deployment requires an adapter that decides whether the policy maps to position,
+  velocity, acceleration, or attitude targets.
 
 ## Evidence to collect
 
@@ -182,11 +191,18 @@ A staged imitation-to-RL pipeline is a practical way to bootstrap autonomous dro
   round-level DAgger resume,
   and PPO trainer-state resume.
   This is practical infrastructure rather than algorithmic novelty, but it matters for reproducibility.
+- A first speed/control branch now exists in code:
+  `GateRaceAviary` supports `control_mode: position_velocity`, which keeps the same 4-D policy action
+  but passes capped velocity feedforward into the PID controller.
+  Directly evaluating the existing state champion under this mode caused crashes,
+  so this should be treated as a retraining branch rather than a plug-in speed boost.
 
 ## Limitations to mention honestly
 
 - current expert is a heuristic gate chaser, not a full minimum-snap planner
 - DCL adapter is still a stub and not yet competition-ready
+- current local waypoint control is stable but conservative,
+  and likely caps racing speed compared with velocity, acceleration, or attitude-target control
 - best completed results currently still use structured state observations rather than end-to-end vision
 - PPO remains sensitive to exploration and reward design
 - validation choice now matters strategically, because the "best" checkpoint depends on whether the metric emphasizes easy-track speed or hard-track robustness

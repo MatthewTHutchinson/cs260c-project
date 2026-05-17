@@ -140,6 +140,10 @@ class GateRaceAviary(BaseAviary):
         pyb_freq: int = 240,
         clip_radius: float = 0.25,
         max_dyaw: float = 0.3,
+        control_mode: str = "position",
+        velocity_horizon: float = 0.5,
+        max_target_speed: float = 4.0,
+        velocity_feedforward_gain: float = 1.0,
         episode_len_sec: float = 12.0,
         history_len: int = 3,
         lookahead_gates: int = 2,
@@ -203,6 +207,12 @@ class GateRaceAviary(BaseAviary):
         self.n_gates = len(self.gates)
         self.clip_radius = clip_radius
         self.max_dyaw = max_dyaw
+        self.control_mode = str(control_mode).strip().lower()
+        if self.control_mode not in {"position", "position_velocity"}:
+            raise ValueError("control_mode must be 'position' or 'position_velocity'.")
+        self.velocity_horizon = max(1e-3, float(velocity_horizon))
+        self.max_target_speed = max(0.0, float(max_target_speed))
+        self.velocity_feedforward_gain = max(0.0, float(velocity_feedforward_gain))
         self._episode_len_sec = episode_len_sec
         self.history_len = history_len
         self.lookahead_gates = max(1, int(lookahead_gates))
@@ -459,8 +469,15 @@ class GateRaceAviary(BaseAviary):
         delta_pos_body = action[:3] * self.clip_radius
         delta_yaw = float(action[3]) * self.max_dyaw
 
-        target_pos = pos + rot @ delta_pos_body
+        delta_pos_world = rot @ delta_pos_body
+        target_pos = pos + delta_pos_world
         target_rpy = np.array([0.0, 0.0, yaw + delta_yaw])
+        target_vel = np.zeros(3)
+        if self.control_mode == "position_velocity":
+            target_vel = self.velocity_feedforward_gain * delta_pos_world / self.velocity_horizon
+            speed = float(np.linalg.norm(target_vel))
+            if self.max_target_speed > 0.0 and speed > self.max_target_speed:
+                target_vel *= self.max_target_speed / speed
 
         rpm, _, _ = self.pid.computeControl(
             control_timestep=self.CTRL_TIMESTEP,
@@ -470,6 +487,7 @@ class GateRaceAviary(BaseAviary):
             cur_ang_vel=ang_vel,
             target_pos=target_pos,
             target_rpy=target_rpy,
+            target_vel=target_vel,
         )
         return rpm.reshape(1, 4)
 
@@ -533,6 +551,10 @@ class GateRaceAviary(BaseAviary):
         info["gates_passed"] = self._gates_passed
         info["next_gate"] = self._next_gate
         info["clip_radius"] = self.clip_radius
+        info["control_mode"] = self.control_mode
+        info["velocity_horizon"] = self.velocity_horizon
+        info["max_target_speed"] = self.max_target_speed
+        info["velocity_feedforward_gain"] = self.velocity_feedforward_gain
         info["track_name"] = self.track_name
         info["observation_source"] = self._observation_source
         if self._camera_active:
@@ -1252,6 +1274,10 @@ def make_env(cfg: dict, gui: bool = False, camera_follow: bool = False) -> GateR
         pyb_freq=int(cfg.get("pyb_freq", 240)),
         clip_radius=float(cfg.get("clip_radius_start", 0.25)),
         max_dyaw=float(cfg.get("max_dyaw", 0.3)),
+        control_mode=str(cfg.get("control_mode", "position")),
+        velocity_horizon=float(cfg.get("velocity_horizon", 0.5)),
+        max_target_speed=float(cfg.get("max_target_speed", 4.0)),
+        velocity_feedforward_gain=float(cfg.get("velocity_feedforward_gain", 1.0)),
         episode_len_sec=float(cfg.get("episode_len_sec", 12.0)),
         history_len=int(cfg.get("history_len", 3)),
         lookahead_gates=int(cfg.get("lookahead_gates", 2)),

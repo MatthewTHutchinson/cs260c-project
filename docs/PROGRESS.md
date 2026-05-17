@@ -110,6 +110,21 @@ Finish `multimodal_obs_v2`, then compare it against:
 
 Update:
 
+- A first control-speed branch has been added:
+  `GateRaceAviary` now supports `control_mode: position_velocity`.
+- In this mode the policy still outputs the same normalized 4-D action,
+  but the environment also derives a capped velocity feedforward target from the local waypoint offset
+  and passes it into the PyBullet PID controller.
+- A direct plug-in test with the existing state champion was unstable,
+  so the new control mode should be trained into rather than used as a drop-in evaluation replacement.
+- New configs:
+  `configs/generalization_obs_position_velocity_eval.yaml`
+  for controlled evaluation,
+  and `configs/generalization_speed_v1.yaml`
+  as the first retraining branch for position-plus-velocity control.
+
+Update:
+
 - the repo now has a completed first end-to-end perception branch:
   onboard RGB rendering in `GateRaceAviary`,
   detector-backed `vision_bridge` observations,

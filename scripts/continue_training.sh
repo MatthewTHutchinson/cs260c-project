@@ -23,6 +23,12 @@ BIDIR_DAG="logs/dagger_generalization_bidirectional_obs_v1"
 BIDIR_PPO="logs/ppo_generalization_bidirectional_obs_v1"
 BIDIR_BEST="$BIDIR_PPO/policy_ppo_best.pt"
 
+SPEED_CFG="configs/generalization_speed_v1.yaml"
+SPEED_BC="logs/bc_generalization_speed_v1"
+SPEED_DAG="logs/dagger_generalization_speed_v1"
+SPEED_PPO="logs/ppo_generalization_speed_v1"
+SPEED_BEST="$SPEED_PPO/policy_ppo_best.pt"
+
 timestamp() {
   date "+%Y-%m-%d %H:%M:%S"
 }
@@ -138,6 +144,49 @@ evaluate_bidirectional_if_ready() {
     | tee "$BIDIR_PPO/eval_legacy_suite.txt"
 }
 
+launch_speed_branch() {
+  if pgrep -f "train_all.py --config ${SPEED_CFG}" >/dev/null 2>&1; then
+    log "Speed branch is already running."
+    return 0
+  fi
+
+  if [[ -f "$SPEED_BEST" ]]; then
+    log "Speed branch already has a PPO best checkpoint at $SPEED_BEST"
+    return 0
+  fi
+
+  log "Launching position-plus-velocity speed branch."
+  caffeinate -dimsu "$PYTHON" train_all.py \
+    --config "$SPEED_CFG" \
+    --bc-out "$SPEED_BC" \
+    --dagger-out "$SPEED_DAG" \
+    --ppo-out "$SPEED_PPO" \
+    --resume
+}
+
+evaluate_speed_if_ready() {
+  if [[ ! -f "$SPEED_BEST" ]]; then
+    log "Skipping speed-branch evaluation because $SPEED_BEST is still missing."
+    return 0
+  fi
+
+  log "Evaluating speed branch on position-plus-velocity suite."
+  "$PYTHON" -m eval.evaluate_track_suite \
+    --config configs/generalization_obs_position_velocity_eval.yaml \
+    --type ppo \
+    --ckpt "$SPEED_BEST" \
+    --episodes 8 \
+    | tee "$SPEED_PPO/eval_position_velocity_suite.txt"
+
+  log "Evaluating speed branch on legacy richer-state suite."
+  "$PYTHON" -m eval.evaluate_track_suite \
+    --config configs/generalization_obs_v1.yaml \
+    --type ppo \
+    --ckpt "$SPEED_BEST" \
+    --episodes 8 \
+    | tee "$SPEED_PPO/eval_legacy_suite.txt"
+}
+
 main() {
   log "continue_training.sh starting"
   wait_for_active_multimodal
@@ -145,6 +194,8 @@ main() {
   evaluate_multimodal_if_ready
   launch_bidirectional_branch
   evaluate_bidirectional_if_ready
+  launch_speed_branch
+  evaluate_speed_if_ready
   log "continue_training.sh finished"
 }
 
