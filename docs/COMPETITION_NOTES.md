@@ -11,7 +11,7 @@ This file is the organized reference for external AI Grand Prix / DCL-facing con
 ## Source hierarchy
 
 1. `Confirmed`:
-   `docs/260508_Technical_Spec_0002.pdf`
+   `docs/reference/260508_Technical_Spec_0002.pdf`
    Document ID `VADR-TS-002`, Issue `00.02`, dated `2026-05-08`
 2. `Historical`:
    the Gmail PDF exports in `docs/`

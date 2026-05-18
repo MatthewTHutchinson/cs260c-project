@@ -130,7 +130,7 @@ def _compose_panel(fullres_rgb: np.ndarray, policy_rgb: np.ndarray, env, info: d
     full_panel = _resize_for_panel(full_panel, int(full_panel.shape[1] * target_h / full_panel.shape[0]), target_h)
 
     policy_up = _resize_for_panel(policy_rgb, 256, 192)
-    policy_up = policy_up[:, :, ::-1]
+    policy_up = policy_up[:, :, ::-1].copy()
     cv2.putText(policy_up, "policy input", (10, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
 
     note = np.full((target_h - policy_up.shape[0], policy_up.shape[1], 3), 24, dtype=np.uint8)
@@ -157,6 +157,8 @@ def main(argv=None):
     parser.add_argument("--ckpt", default=None)
     parser.add_argument("--preset", choices=sorted(_PRESETS.keys()), default=None)
     parser.add_argument("--episodes", type=int, default=1)
+    parser.add_argument("--max-steps", type=int, default=None,
+                        help="Optional maximum control steps per episode for short debug captures.")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--gui", action="store_true",
                         help="Also show the PyBullet GUI.")
@@ -170,6 +172,8 @@ def main(argv=None):
                         help="Optional directory to save debug frames as PNGs.")
     parser.add_argument("--save-every", type=int, default=10,
                         help="Save every Nth frame when --save-dir is set.")
+    parser.add_argument("--save-raw", action="store_true",
+                        help="Also save full-resolution and policy-input camera frames.")
     args = parser.parse_args(argv)
 
     if args.preset is not None:
@@ -219,6 +223,15 @@ def main(argv=None):
                 if args.save_dir is not None and frame_idx % max(1, args.save_every) == 0:
                     out_path = os.path.join(args.save_dir, f"perception_{frame_idx:06d}.png")
                     cv2.imwrite(out_path, panel)
+                    if args.save_raw:
+                        cv2.imwrite(
+                            os.path.join(args.save_dir, f"fullres_{frame_idx:06d}.png"),
+                            fullres[:, :, ::-1],
+                        )
+                        cv2.imwrite(
+                            os.path.join(args.save_dir, f"policy_{frame_idx:06d}.png"),
+                            policy_rgb[:, :, ::-1],
+                        )
 
                 frame_idx += 1
                 if not args.no_window:
@@ -227,6 +240,8 @@ def main(argv=None):
                         return
                 if args.realtime:
                     time.sleep(control_dt)
+                if args.max_steps is not None and frame_idx >= int(args.max_steps):
+                    done = True
     finally:
         env.close()
         if not args.no_window:

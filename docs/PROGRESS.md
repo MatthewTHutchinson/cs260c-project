@@ -32,7 +32,7 @@ Current status:
   the old state-only PPO under `configs/vision_bridge_eval_v1.yaml` still reached `0%` completion and `100%` OOB in the quick bridge eval.
 - External source hygiene is now improved:
   `docs/COMPETITION_NOTES.md` is the main source hierarchy for AI Grand Prix / DCL-facing facts,
-  anchored on `docs/260508_Technical_Spec_0002.pdf`.
+  anchored on `docs/reference/260508_Technical_Spec_0002.pdf`.
 - The older Gmail PDF exports are now stored in `docs/` and should be treated as historical / possibly stale unless the latest spec confirms them.
 - The teacher-warmstarted follow-up is now active:
   `configs/multimodal_obs_v2.yaml`
@@ -173,7 +173,7 @@ Suggested direction:
   reconcile the repo docs against the latest external AI Grand Prix technical spec
   and stop relying on stale brainstorming/email assumptions as if they were current truth.
 - Inputs reviewed:
-  `docs/260508_Technical_Spec_0002.pdf`
+  `docs/reference/260508_Technical_Spec_0002.pdf`
   plus the older Gmail PDF exports now stored in `docs/`.
 - Confirmed additions captured:
   MAVLink-over-UDP interface,
@@ -302,7 +302,7 @@ Suggested direction:
 - Date: 2026-05-13
 - Goal:
   bring the repo's camera/perception assumptions closer to
-  `docs/260508_Technical_Spec_0002.pdf`
+  `docs/reference/260508_Technical_Spec_0002.pdf`
   without breaking the faster research-oriented training configs.
 - Code changes:
   `GateDetector.CameraParams` now defaults to the latest spec's

@@ -2,7 +2,7 @@
 
 This file is a scaffold, not a working competition client.
 It has not yet been wired to the official MAVLink / UDP runtime described in
-`docs/260508_Technical_Spec_0002.pdf`, and it should fail fast if used.
+`docs/reference/260508_Technical_Spec_0002.pdf`, and it should fail fast if used.
 
 Architecture
 ------------

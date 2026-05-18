@@ -199,7 +199,7 @@ Expert outputs same action space as learner (body-frame delta).
   `KMP_DUPLICATE_LIB_OK=TRUE`
   to work around a duplicate OpenMP runtime issue in the Conda env.
 - Added `docs/COMPETITION_NOTES.md` and moved the latest external reference PDF to:
-  `docs/260508_Technical_Spec_0002.pdf`
+  `docs/reference/260508_Technical_Spec_0002.pdf`
   This is now the main competition-facing source hierarchy and confidence tracker.
 - The old `brainstorming/` folder has been retired after promoting the still-useful content into the `docs/` markdown files.
 - `multimodal_obs_v1` has completed end to end.
@@ -267,7 +267,7 @@ Expert outputs same action space as learner (body-frame delta).
 - For external AI Grand Prix / DCL facts, start with:
   `docs/COMPETITION_NOTES.md`
   and only then consult
-  `docs/260508_Technical_Spec_0002.pdf`.
+  `docs/reference/260508_Technical_Spec_0002.pdf`.
 - Treat the Gmail PDF exports in `docs/` as historical context, not primary truth.
 - Do not rely on the old `brainstorming/` directory; it has been retired.
 - The published spec's `[fx, fy]` and `VFoV` are not perfectly self-consistent.

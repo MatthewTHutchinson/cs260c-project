@@ -38,7 +38,7 @@ A staged imitation-to-RL pipeline is a practical way to bootstrap autonomous dro
 ## Competition-facing constraints to state clearly
 
 - Latest external source of truth:
-  `docs/260508_Technical_Spec_0002.pdf`
+  `docs/reference/260508_Technical_Spec_0002.pdf`
   (`VADR-TS-002`, Issue `00.02`, dated `2026-05-08`)
 - Official interface summary from that spec:
   MAVLink 2 over UDP,

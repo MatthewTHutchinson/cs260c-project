@@ -28,7 +28,7 @@ If you want the strongest current model, start with `logs/ppo_generalization_obs
 For external AI Grand Prix / DCL-facing facts, use:
 
 - `docs/COMPETITION_NOTES.md`
-- backing PDF: `docs/260508_Technical_Spec_0002.pdf`
+- backing PDF: `docs/reference/260508_Technical_Spec_0002.pdf`
 
 The older Gmail PDF exports in `docs/` are still useful context, but they should be treated as historical and possibly stale unless the latest spec also confirms them.
 

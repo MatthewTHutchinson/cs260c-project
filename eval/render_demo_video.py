@@ -251,6 +251,8 @@ def main(argv=None):
     parser.add_argument("--output", required=True)
     parser.add_argument("--title", default="CS260C Drone Racing Demo")
     parser.add_argument("--episodes", type=int, default=1)
+    parser.add_argument("--max-steps", type=int, default=None,
+                        help="Optional maximum control steps per episode for short clips.")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--fps", type=int, default=20)
     parser.add_argument("--width", type=int, default=1280)
@@ -322,6 +324,8 @@ def main(argv=None):
                 obs, _, terminated, truncated, info = env.step(action)
                 done = terminated or truncated
                 step_idx += 1
+                if args.max_steps is not None and step_idx >= int(args.max_steps):
+                    done = True
     finally:
         env.close()
         if ffmpeg.stdin is not None:
