@@ -1,36 +1,25 @@
 # CS 260C Project: Autonomous Drone Gate Racing
 
-This repository contains a staged imitation-learning and reinforcement-learning pipeline for autonomous quadrotor gate racing in `gym-pybullet-drones`.
+This repository is being reset around a VQ1-first autonomous drone racing stack:
 
-The current training flow is:
+```text
+FPV camera + telemetry
+  -> gate recognition
+  -> path planning and navigation
+  -> drone control adapter
+  -> simulator commands
+```
 
-1. Behavior Cloning (BC)
-2. DAgger dataset aggregation
-3. PPO fine-tuning from the DAgger checkpoint
-
-## Current best checkpoints
-
-- Best overall current model:
-  `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`
-  with richer-observation hard-suite return `82.49`
-  and richer-observation easy-suite return `82.95`
-
-- New vision branch status:
-  onboard RGB rendering, detector-backed `vision_bridge` observations,
-  scene visual randomization, and multimodal state+vision training are now implemented.
-  The first multimodal config is `configs/multimodal_obs_v1.yaml`.
-  A teacher-warmstarted follow-up is prepared in `configs/multimodal_obs_v2.yaml`.
-
-If you want the strongest current model, start with `logs/ppo_generalization_obs_v1/policy_ppo_best.pt`.
+The older BC -> DAgger -> PPO work remains in the repo as historical scaffolding, but it is no longer the project direction. Do not start from old "best checkpoint" claims when making new competition-facing decisions.
 
 ## Competition context
 
 For external AI Grand Prix / DCL-facing facts, use:
 
-- `docs/COMPETITION_NOTES.md`
+- `docs/COMPETITION_CONTEXT.md`
 - backing PDF: `docs/reference/260508_Technical_Spec_0002.pdf`
 
-The older Gmail PDF exports in `docs/` are still useful context, but they should be treated as historical and possibly stale unless the latest spec also confirms them.
+The April 10 pre-spec notes and older Gmail PDF exports are useful context, but interface details should defer to the May 8 technical spec when they conflict.
 
 ## Project map
 
@@ -40,7 +29,7 @@ The older Gmail PDF exports in `docs/` are still useful context, but they should
 - `training/`: BC, DAgger, and PPO training scripts
 - `eval/`: evaluation, plotting, and simulator visualization
 - `configs/default.yaml`: default hyperparameters and environment settings
-- `docs/`: progress tracking, report notes, and portfolio notes
+- `docs/`: current VQ1 strategy docs and archived midterm-era notes
 - `CLAUDE.md`: working context and recent change log for Claude Code
 
 ## Environment
@@ -339,13 +328,7 @@ Continue training automatically after the active `multimodal_obs_v2` run:
 nohup zsh scripts/continue_training.sh > logs/continue_training.log 2>&1 &
 ```
 
-That script will:
-- wait for `multimodal_obs_v2` to finish if it is still active
-- resume `multimodal_obs_v2` if it exited before writing `policy_ppo_best.pt`
-- evaluate the finished multimodal PPO checkpoint on the standard and competition-spec suites
-- evaluate the finished multimodal PPO checkpoint on the new extended multimodal directional/long-course suite
-- launch `generalization_bidirectional_obs_v1` with `--resume`
-- evaluate the finished bidirectional state PPO checkpoint on the extended and legacy richer-state suites
+That script belongs to the old training workflow. Treat it as historical until the VQ1 environment and control stack are rebuilt.
 
 Check long-run training status quickly:
 
@@ -357,17 +340,17 @@ zsh scripts/training_status.sh
 
 Use these files as the shared documentation backbone:
 
-- `docs/PROGRESS.md`: chronological experiment log and current status
-- `docs/REPORT_NOTES.md`: class report outline, claims, and evidence
-- `docs/PORTFOLIO_NOTES.md`: public-facing project story and visuals checklist
-- `docs/BRAINSTORMING.md`: roadmap, limitations, and future observation / vision plans
-- `docs/COMPETITION_NOTES.md`: current external source-of-truth notes, confidence labels, and open questions
+- `docs/GROUND_UP_RESTART.md`: reset decision, architecture, and current priorities
+- `docs/COMPETITION_CONTEXT.md`: source hierarchy, April 10 notes, May 8 spec anchors, and open questions
+- `docs/GATE_RECOGNITION.md`: FPV gate detection and tracking plan
+- `docs/DRONE_CONTROL.md`: command architecture and VQ1 control strategy
+- `docs/PATH_PLANNING_NAVIGATION.md`: gate-order navigation and planning strategy
 
 The intended workflow is simple:
 
-1. After each meaningful run, update `docs/PROGRESS.md`.
-2. When a result matters for the report, summarize it in `docs/REPORT_NOTES.md`.
-3. When a result is portfolio-worthy, translate it into the cleaner narrative in `docs/PORTFOLIO_NOTES.md`.
-4. When a competition-facing assumption changes, reconcile it in `docs/COMPETITION_NOTES.md`.
+1. When a competition-facing assumption changes, update `docs/COMPETITION_CONTEXT.md`.
+2. When detector behavior changes, update `docs/GATE_RECOGNITION.md`.
+3. When command/interface behavior changes, update `docs/DRONE_CONTROL.md`.
+4. When navigation logic changes, update `docs/PATH_PLANNING_NAVIGATION.md`.
 
-Older drafts in the retired `brainstorming/` folder should no longer be treated as current documentation.
+Midterm-era drafts are archived in `docs/archive/2026-05-ground-up-reset/` and should not be treated as current direction.
