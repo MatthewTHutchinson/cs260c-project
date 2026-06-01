@@ -164,7 +164,7 @@ If repeated attempts reveal a consistent turn direction after a gate, encode tha
 
 ## Simulator Reset
 
-The PyBullet environment should support finite courses:
+The active harness should support finite courses:
 
 - explicit start gate
 - ordered intermediate gates
@@ -198,5 +198,5 @@ Do not start here. VQ1 success is a reliable gate-order navigation problem first
 3. Implement reactive guidance law.
 4. Implement commit/pass/reacquire logic.
 5. Build playback tests from logged VQ1 frames as soon as available.
-6. Update PyBullet to finite racecourse semantics.
+6. Validate finite racecourse semantics in Elodin and later VQ1.
 7. Add evaluation metrics for gate order, finish, search time, and detection loss.

@@ -158,7 +158,7 @@ Runtime metrics:
 3. Build a small frame-review/labeling utility.
 4. Tune the classical detector on real VQ1 frames.
 5. Add detector telemetry to evaluation logs.
-6. Add a no-ground-truth perception mode in PyBullet.
+6. Tune the detector against Elodin FPV frames without world-pose fallback.
 7. Keep a simple visual overlay tool for debugging candidates.
 
 ## Red Lines

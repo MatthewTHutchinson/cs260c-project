@@ -1,0 +1,481 @@
+diff --git a/sim/main.py b/sim/main.py
+index f60ddd1..3abdb61 100644
+--- a/sim/main.py
++++ b/sim/main.py
+@@ -15,6 +15,7 @@ Prerequisites:
+        uv run python scripts/configure_betaflight.py
+ """
+ 
++import atexit
+ import importlib
+ import os
+ import re
+@@ -54,9 +55,33 @@ except AttributeError:
+     pass
+ 
+ 
++def _env_bool(name: str, default: bool) -> bool:
++    raw = os.environ.get(name)
++    if raw is None:
++        return default
++    return raw.strip().lower() not in {"0", "false", "no", "off"}
++
++
++def _env_float(name: str, default: float) -> float:
++    raw = os.environ.get(name)
++    if raw is None:
++        return default
++    return float(raw)
++
++
+ config = DEFAULT_CONFIG
++config.simulation_time = _env_float("ELODIN_SIM_TIME", config.simulation_time)
++config.fpv_rate = _env_float("ELODIN_FPV_RATE", config.fpv_rate)
+ config.set_as_global()
+ 
++ENABLE_FPV_RENDER = _env_bool("ELODIN_ENABLE_FPV", True)
++GENERATE_REAL_TIME = _env_bool("ELODIN_REAL_TIME", True)
++INTERACTIVE_RUN = _env_bool("ELODIN_INTERACTIVE", True)
++MANAGE_BETAFLIGHT_INLINE = _env_bool("ELODIN_MANAGE_BETAFLIGHT_INLINE", False)
++BETAFLIGHT_LOG_PATH = Path(
++    os.environ.get("ELODIN_BETAFLIGHT_LOG", "/tmp/elodin-betaflight-sitl.log")
++)
++
+ REPO_ROOT = _REPO_ROOT
+ BETAFLIGHT_PATH = REPO_ROOT / "betaflight" / "obj" / "main" / "betaflight_SITL.elf"
+ 
+@@ -78,7 +103,55 @@ def cleanup_stale_betaflight():
+         pass
+ 
+ 
+-if "--no-s10" not in sys.argv:
++_inline_betaflight_process: subprocess.Popen | None = None
++_inline_betaflight_log = None
++
++
++def start_inline_betaflight() -> None:
++    """Start Betaflight under this Python process for local smoke tests."""
++    global _inline_betaflight_process, _inline_betaflight_log
++
++    if _inline_betaflight_process is not None:
++        return
++
++    cleanup_stale_betaflight()
++    BETAFLIGHT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
++    _inline_betaflight_log = open(BETAFLIGHT_LOG_PATH, "w")
++    _inline_betaflight_process = subprocess.Popen(
++        [str(BETAFLIGHT_PATH)],
++        cwd=str(REPO_ROOT),
++        stdout=_inline_betaflight_log,
++        stderr=subprocess.STDOUT,
++    )
++    print(
++        f"[CFG] Inline Betaflight pid={_inline_betaflight_process.pid} "
++        f"log={BETAFLIGHT_LOG_PATH}"
++    )
++
++
++def stop_inline_betaflight() -> None:
++    """Stop the inline Betaflight process, if this run owns one."""
++    global _inline_betaflight_process, _inline_betaflight_log
++
++    if _inline_betaflight_process is not None:
++        if _inline_betaflight_process.poll() is None:
++            _inline_betaflight_process.terminate()
++            try:
++                _inline_betaflight_process.wait(timeout=3)
++            except subprocess.TimeoutExpired:
++                _inline_betaflight_process.kill()
++                _inline_betaflight_process.wait(timeout=3)
++        _inline_betaflight_process = None
++
++    if _inline_betaflight_log is not None:
++        _inline_betaflight_log.close()
++        _inline_betaflight_log = None
++
++
++atexit.register(stop_inline_betaflight)
++
++
++if not MANAGE_BETAFLIGHT_INLINE and "--no-s10" not in sys.argv:
+     cleanup_stale_betaflight()
+ 
+ 
+@@ -180,20 +253,26 @@ visualization = create_visualization_system(config)
+ system = physics | sensors | visualization
+ 
+ 
+-# Register Betaflight SITL as an s10 process recipe so s10 manages its
+-# lifecycle (start/stop) in every execution context.
+-betaflight_recipe = el.s10.PyRecipe.process(
+-    name="Betaflight SITL",
+-    cmd=str(BETAFLIGHT_PATH),
+-    cwd=str(REPO_ROOT),
+-)
+-world.recipe(betaflight_recipe)
++# Register Betaflight SITL as an s10 process recipe unless this process is
++# explicitly owning Betaflight for local smoke tests.
++if not MANAGE_BETAFLIGHT_INLINE:
++    betaflight_recipe = el.s10.PyRecipe.process(
++        name="Betaflight SITL",
++        cmd=str(BETAFLIGHT_PATH),
++        cwd=str(REPO_ROOT),
++    )
++    world.recipe(betaflight_recipe)
+ 
+ print(f"[CFG] Betaflight SITL: {BETAFLIGHT_PATH.name}")
+ print(f"[CFG] Simulation: {config.simulation_time}s at {config.pid_rate:.0f}Hz PID loop")
+ print(
+     f"[CFG] Sensor rates: gyro={config.gyro_rate:.0f}Hz, accel={config.accel_rate:.0f}Hz, baro={config.baro_rate:.0f}Hz, mag={config.mag_rate:.0f}Hz"
+ )
++print(
++    f"[CFG] Runtime: fpv_render={ENABLE_FPV_RENDER} "
++    f"real_time={GENERATE_REAL_TIME} interactive={INTERACTIVE_RUN} "
++    f"inline_betaflight={MANAGE_BETAFLIGHT_INLINE}"
++)
+ 
+ 
+ @dataclass
+@@ -254,6 +333,8 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
+ 
+     # Lazy initialization - only start bridge when first tick runs
+     if bridge[0] is None or not getattr(bridge[0], "_started", False):
++        if MANAGE_BETAFLIGHT_INLINE:
++            start_inline_betaflight()
+         print("[SITL] Initializing bridge...")
+         pending_bridge = BetaflightSyncBridge(timeout_ms=100)
+         sensor_buf[0] = SensorDataBuffer()
+@@ -368,7 +449,7 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
+     # Request a camera frame at the configured FPV rate, then collect the latest
+     # frame from the message log. The solver still runs every tick and can tell
+     # whether the frame is new using frame_fresh.
+-    if tick % RENDER_EVERY == 0 and tick > _warmup_done_tick[0]:
++    if ENABLE_FPV_RENDER and tick % RENDER_EVERY == 0 and tick > _warmup_done_tick[0]:
+         try:
+             fpv_camera.request_render(ctx, FPV_CAM_NAME)
+             _last_render_tick[0] = tick
+@@ -376,22 +457,23 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
+             if tick % max(1, int(config.pid_rate)) == 0:
+                 print(f"[FPV] render trigger failed at tick {tick}: {e}")
+ 
+-    try:
+-        frame = fpv_camera.collect_frame(ctx, FPV_CAM_NAME)
+-        if frame is not None and tick == _last_render_tick[0]:
+-            _latest_frame[0] = frame
+-            _latest_frame_tick[0] = tick
+-            _fpv_frames[0] += 1
+-            if not _fpv_first_logged[0]:
+-                print(
+-                    f"[FPV] First frame at tick {tick}: "
+-                    f"shape={frame.shape}, dtype={frame.dtype}, "
+-                    f"nonzero={int(np.count_nonzero(frame))}"
+-                )
+-                _fpv_first_logged[0] = True
+-    except Exception as e:
+-        if tick > 200 and _fpv_frames[0] == 0:
+-            print(f"[FPV] collect error at tick {tick}: {e}")
++    if ENABLE_FPV_RENDER:
++        try:
++            frame = fpv_camera.collect_frame(ctx, FPV_CAM_NAME)
++            if frame is not None and tick == _last_render_tick[0]:
++                _latest_frame[0] = frame
++                _latest_frame_tick[0] = tick
++                _fpv_frames[0] += 1
++                if not _fpv_first_logged[0]:
++                    print(
++                        f"[FPV] First frame at tick {tick}: "
++                        f"shape={frame.shape}, dtype={frame.dtype}, "
++                        f"nonzero={int(np.count_nonzero(frame))}"
++                    )
++                    _fpv_first_logged[0] = True
++        except Exception as e:
++            if tick > 200 and _fpv_frames[0] == 0:
++                print(f"[FPV] collect error at tick {tick}: {e}")
+ 
+     next_gate_index = (
+         _race_last_gate[0] + 1
+@@ -489,6 +571,7 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
+     if tick >= MAX_TICKS - 1:
+         _completed[0] = True
+         b.stop()
++        stop_inline_betaflight()
+         elapsed = time.time() - start_time[0]
+ 
+         # Read final position
+@@ -559,16 +642,21 @@ def next_filename(pattern: str) -> str:
+ 
+ db_filename = next_filename("betaflight_dbXXX")
+ print(f"Writing database to: {db_filename}")
+-world.run(
+-    system,
+-    simulation_rate=config.pid_rate,
+-    generate_real_time=True,
+-    post_step=sitl_post_step,
+-    db_path=db_filename,
+-    start_timestamp=0,
+-    max_ticks=MAX_TICKS,
+-    interactive=True,
+-)
++try:
++    world.run(
++        system,
++        simulation_rate=config.pid_rate,
++        generate_real_time=GENERATE_REAL_TIME,
++        post_step=sitl_post_step,
++        db_path=db_filename,
++        start_timestamp=0,
++        max_ticks=MAX_TICKS,
++        interactive=INTERACTIVE_RUN,
++    )
++finally:
++    if bridge[0] is not None:
++        bridge[0].stop()
++    stop_inline_betaflight()
+ 
+ if not bridge[0]:
+     print("\nNo simulation ticks executed.")
+diff --git a/solver/cs260c_pilot.py b/solver/cs260c_pilot.py
+new file mode 100644
+index 0000000..77a0e75
+--- /dev/null
++++ b/solver/cs260c_pilot.py
+@@ -0,0 +1,239 @@
++"""CS 260C perception-guided racing pilot for the Elodin harness.
++
++This solver deliberately ignores Elodin's world pose. It consumes only the FPV
++frame plus IMU-like telemetry and delegates the racing logic to the course repo
++at `/Users/matthewhutchinson/dev/cs260c-project/algorithm`.
++"""
++
++from __future__ import annotations
++
++import atexit
++import csv
++import os
++import sys
++from pathlib import Path
++
++import numpy as np
++
++from solver.api import RCCommand, SensorUpdate
++
++
++PROJECT_ROOT = Path("/Users/matthewhutchinson/dev/cs260c-project")
++if str(PROJECT_ROOT) not in sys.path:
++    sys.path.insert(0, str(PROJECT_ROOT))
++
++from algorithm import AutonomousRacingPilot, VehicleTelemetry  # noqa: E402
++from algorithm.control_adapter import to_betaflight_rc_fields  # noqa: E402
++
++
++T_DISARMED_END = 0.50
++T_ARM_IDLE_END = 0.75
++T_TAKEOFF_END = 1.60
++
++TAKEOFF_THROTTLE = 1300
++
++_pilot = AutonomousRacingPilot(frame_format="rgb")
++_last_tick = -1
++_trace_file = None
++_trace_writer = None
++_frame_save_count = 0
++_frame_dir_announced = False
++
++
++def _env_int(name: str, default: int) -> int:
++    raw = os.environ.get(name)
++    if raw is None:
++        return default
++    try:
++        return int(raw)
++    except ValueError:
++        return default
++
++
++def _open_trace() -> csv.DictWriter | None:
++    global _trace_file, _trace_writer
++
++    if _trace_writer is not None:
++        return _trace_writer
++
++    trace_path = os.environ.get("CS260C_PILOT_TRACE")
++    if not trace_path:
++        return None
++
++    path = Path(trace_path).expanduser()
++    path.parent.mkdir(parents=True, exist_ok=True)
++    _trace_file = path.open("w", newline="")
++    _trace_writer = csv.DictWriter(
++        _trace_file,
++        fieldnames=[
++            "tick",
++            "timestamp_s",
++            "frame_fresh",
++            "mode",
++            "confidence",
++            "bearing_h_rad",
++            "bearing_v_rad",
++            "distance_m",
++            "pixel_x",
++            "pixel_y",
++            "roll_rate_rad_s",
++            "pitch_rate_rad_s",
++            "yaw_rate_rad_s",
++            "thrust_norm",
++            "rc_throttle",
++            "rc_roll",
++            "rc_pitch",
++            "rc_yaw",
++            "rc_arm",
++        ],
++    )
++    _trace_writer.writeheader()
++    print(f"[CS260C] writing pilot trace to {path}")
++    return _trace_writer
++
++
++def _close_trace() -> None:
++    global _trace_file, _trace_writer
++
++    if _trace_file is not None:
++        _trace_file.close()
++    _trace_file = None
++    _trace_writer = None
++
++
++atexit.register(_close_trace)
++
++
++def reset_state() -> None:
++    global _last_tick, _frame_save_count
++    _pilot.reset()
++    _last_tick = -1
++    _frame_save_count = 0
++
++
++def _trace(update: SensorUpdate, gate, command, rc: dict[str, int]) -> None:
++    writer = _open_trace()
++    if writer is None:
++        return
++
++    if not update.frame_fresh and update.tick % 20 != 0:
++        return
++
++    writer.writerow(
++        {
++            "tick": int(update.tick),
++            "timestamp_s": f"{float(update.t):.6f}",
++            "frame_fresh": int(bool(update.frame_fresh)),
++            "mode": gate.mode.value,
++            "confidence": f"{gate.confidence:.6f}",
++            "bearing_h_rad": f"{gate.bearing_h_rad:.6f}",
++            "bearing_v_rad": f"{gate.bearing_v_rad:.6f}",
++            "distance_m": "" if gate.distance_m is None else f"{gate.distance_m:.6f}",
++            "pixel_x": "" if gate.pixel_center is None else f"{gate.pixel_center[0]:.3f}",
++            "pixel_y": "" if gate.pixel_center is None else f"{gate.pixel_center[1]:.3f}",
++            "roll_rate_rad_s": f"{command.roll_rate_rad_s:.6f}",
++            "pitch_rate_rad_s": f"{command.pitch_rate_rad_s:.6f}",
++            "yaw_rate_rad_s": f"{command.yaw_rate_rad_s:.6f}",
++            "thrust_norm": f"{command.thrust_norm:.6f}",
++            "rc_throttle": rc["throttle"],
++            "rc_roll": rc["roll"],
++            "rc_pitch": rc["pitch"],
++            "rc_yaw": rc["yaw"],
++            "rc_arm": rc["arm"],
++        }
++    )
++
++
++def _frame_rgb(update: SensorUpdate) -> np.ndarray | None:
++    if update.frame_rgba is None:
++        return None
++    frame = np.asarray(update.frame_rgba)
++    if frame.ndim != 3 or frame.shape[2] < 3:
++        return None
++    return frame[:, :, :3]
++
++
++def _save_frame(update: SensorUpdate, frame_rgb: np.ndarray | None) -> None:
++    """Optionally save fresh FPV frames for offline detector validation."""
++    global _frame_save_count, _frame_dir_announced
++
++    frame_dir = os.environ.get("CS260C_FRAME_DIR")
++    if not frame_dir or frame_rgb is None or not update.frame_fresh:
++        return
++
++    stride = max(1, _env_int("CS260C_FRAME_STRIDE", 1))
++    if _frame_save_count % stride != 0:
++        _frame_save_count += 1
++        return
++
++    path = Path(frame_dir).expanduser()
++    path.mkdir(parents=True, exist_ok=True)
++    if not _frame_dir_announced:
++        print(f"[CS260C] saving FPV frames to {path}")
++        _frame_dir_announced = True
++
++    image = np.asarray(frame_rgb, dtype=np.uint8)
++    if image.ndim != 3 or image.shape[2] < 3:
++        return
++    image = np.ascontiguousarray(image[:, :, :3])
++    height, width = image.shape[:2]
++    out_path = path / f"fpv_{int(update.tick):07d}_{float(update.t):08.3f}.ppm"
++    with out_path.open("wb") as f:
++        f.write(f"P6\n{width} {height}\n255\n".encode("ascii"))
++        f.write(image.tobytes())
++    _frame_save_count += 1
++
++
++def _telemetry(update: SensorUpdate) -> VehicleTelemetry:
++    return VehicleTelemetry(
++        angular_rates_rad_s=np.asarray(update.gyro, dtype=np.float64),
++        acceleration_m_s2=np.asarray(update.accel, dtype=np.float64),
++        timestamp_s=float(update.t),
++    )
++
++
++def _centered(throttle: int, *, arm: bool = True) -> RCCommand:
++    return RCCommand(
++        arm=1800 if arm else 1000,
++        throttle=int(throttle),
++        roll=1500,
++        pitch=1500,
++        yaw=1500,
++    )
++
++
++def autopilot(update: SensorUpdate) -> RCCommand:
++    """Elodin solver entrypoint."""
++    global _last_tick
++
++    if update.tick < _last_tick:
++        reset_state()
++    _last_tick = update.tick
++
++    if update.t < T_DISARMED_END:
++        return _centered(1000, arm=False)
++
++    if update.t < T_ARM_IDLE_END:
++        return _centered(1000, arm=True)
++
++    if update.t < T_TAKEOFF_END:
++        return _centered(TAKEOFF_THROTTLE, arm=True)
++
++    frame_rgb = _frame_rgb(update)
++    _save_frame(update, frame_rgb)
++
++    command, gate = _pilot.update(
++        frame_rgb,
++        _telemetry(update),
++        timestamp_s=float(update.t),
++    )
++    rc = to_betaflight_rc_fields(command)
++    _trace(update, gate, command, rc)
++
++    return RCCommand(
++        arm=rc["arm"],
++        throttle=rc["throttle"],
++        roll=rc["roll"],
++        pitch=rc["pitch"],
++        yaw=rc["yaw"],
++    )

@@ -173,7 +173,7 @@ yaw = current_yaw + yaw_delta
 Why:
 
 - close to the old repo action
-- stable for learning in PyBullet
+- stable for learning-oriented simulators
 
 Risk:
 
@@ -236,11 +236,11 @@ All sign conventions must be tested with small commands:
 - yaw positive direction
 - vertical command sign
 
-## PyBullet Control Reset
+## Local Harness Control Reset
 
-The old body-frame waypoint action is no longer the main research target, but it remains useful as a sandbox baseline.
+The old body-frame waypoint action is no longer the main research target. The active local harness is Elodin, with the PyBullet stack preserved under `legacy/pybullet/`.
 
-New simulator work should add a control path that better matches the internal command interface:
+New harness work should add a control path that better matches the internal command interface:
 
 ```text
 [roll_or_roll_rate, pitch_or_pitch_rate, thrust, yaw_rate]
@@ -261,6 +261,6 @@ Then compare:
 4. Record command response logs.
 5. Compare attitude-rate/thrust against body-velocity/yaw-rate.
 6. Choose the first real control adapter.
-7. Mirror that adapter in PyBullet.
+7. Mirror that adapter in Elodin.
 8. Implement the reactive gate-centering baseline.
 9. Only then consider learned control policies.

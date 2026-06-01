@@ -124,9 +124,15 @@ MAVSDK/MAVLink interpretation:
 - `SET_ATTITUDE_TARGET` carries attitude/body-rate plus thrust style control and is the closest current match to "Pilot Commands -> Stabilized Controller."
 - `SET_POSITION_TARGET_LOCAL_NED` can represent local/body position, velocity, acceleration, yaw, and yaw-rate setpoints, but global coordinate navigation remains out because GPS/global position is not exposed.
 
+IMU interpretation:
+
+- Yes, the current spec lists `HIGHRES_IMU` as a `Simulator -> Client` message.
+- In MAVLink `common.xml`, `HIGHRES_IMU` includes acceleration fields `xacc`, `yacc`, `zacc` in `m/s/s` and angular-rate fields `xgyro`, `ygyro`, `zgyro` in `rad/s`, along with magnetometer, pressure, temperature, timestamp, and update flags.
+- The spec table labels one `HIGHRES_IMU` row as vehicle status and another as measurements, likely because of PDF/table formatting. Treat the message as available telemetry, but verify exact field updates and rate in the VQ1 logger.
+
 ## Strategic Implications
 
-VQ1 should be treated as a completion problem first. A slow but reliable system that detects gates, passes them in order, and avoids disqualification is more valuable than a fast system that only works in our PyBullet assumptions.
+VQ1 should be treated as a completion problem first. A slow but reliable system that detects gates, passes them in order, and avoids disqualification is more valuable than a fast system that only works in local simulator assumptions.
 
 The engineering stack should be organized around:
 
