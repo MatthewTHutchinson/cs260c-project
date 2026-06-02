@@ -15,7 +15,7 @@ from algorithm.types import GateEstimate, TrackMode
 class GateTrackerConfig:
     """Tuning knobs for short-horizon temporal tracking."""
 
-    max_track_age_s: float = 0.35
+    max_track_age_s: float = 0.85
     min_detect_confidence: float = 0.08
     tracked_confidence_decay: float = 0.55
     commit_distance_m: float = 1.6

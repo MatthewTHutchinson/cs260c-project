@@ -212,6 +212,11 @@ launching so stale files do not get mixed with the current run. Set
 `CLEAR_EDITOR_LOGS=0` if you intentionally want to append a manual debugging
 session without clearing old artifacts.
 
+The wrapper also clears stale Elodin editor/render-server/Betaflight processes
+before launch and logs both the Elodin CLI version and Python package version.
+This matters because the FPV camera path depends on the `0.17.3` sensor-camera
+API, where frames are published to DB messages by the render server.
+
 Run detector inspection on those frames with:
 
 ```bash
@@ -264,6 +269,41 @@ Latest editor audit on 2026-06-01:
   lifecycle where Betaflight exits or the drone remains disarmed before the
   solver trace begins. Treat that as a harness lifecycle problem, separate
   from the camera handoff, detector color, and pitch-sign bugs above.
+
+Follow-up validation on 2026-06-02:
+
+- Fast local checks passed:
+  - Python compile for `algorithm/*.py` and `scripts/*.py`
+  - orange synthetic gate detection
+  - Elodin-like blue synthetic gate detection
+  - internal forward pitch maps to Betaflight RC pitch above center
+- The sibling Elodin harness still passes `uv run pytest`: `36 passed`.
+- The deterministic no-FPV smoke with `RACE_SOLVER=solver.cs260c_pilot`
+  passed with successful takeoff and `498` warmup responses.
+- A clean 4 s editor run validated the live FPV path:
+  - Elodin CLI and Python package both reported `0.17.3+3a11ade`
+  - SITL warmup reached `481` responses
+  - FPV produced `121` frames against a target of about `119`
+  - pilot trace contained `detected=56`, `tracked=27`, `search=40`
+  - drone motion moved toward positive X after the pitch-sign fix
+    (`x=+1.96m` by 3 s), rather than backward toward negative X
+- The 4 s run still did not pass gate 0. Trace overlays showed the gate
+  climbing off the top edge of the FPV image: first detections were around
+  `pixel_y=29.5`, and the last tracked estimate was around `pixel_y=2.0`.
+  This makes the current bottleneck vertical/FOV-aware approach control.
+- Controller follow-up after that audit:
+  - suppress forward pitch when vertical bearing is large
+  - increase climb thrust authority
+  - keep recent tracked estimates for `0.85 s`
+  - let tracked estimates inside that age window command climb even after
+    confidence decays
+- Offline replay on the same 73 saved editor frames improved from `31/73`
+  usable gate frames before the FOV-aware change to `46/73` after it. The
+  late top-edge tracked command now climbs with high throttle instead of
+  dropping immediately into yaw-search.
+- Invalid editor starts can still occur. If the editor log shows Betaflight
+  killed, no `logs/elodin_pilot_trace_editor.csv`, and no saved FPV frames,
+  discard that run and rerun after cleanup; it is not an algorithm result.
 
 - `solver/cs260c_pilot.py` now imports the active `algorithm/` package and maps `AutonomousRacingPilot` output to Elodin `RCCommand` without passing world pose into the pilot.
 

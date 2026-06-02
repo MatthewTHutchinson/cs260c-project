@@ -15,19 +15,21 @@ class ReactiveControllerGains:
 
     yaw_gain: float = 2.2
     roll_gain: float = 0.35
-    vertical_gain: float = 0.30
+    vertical_gain: float = 0.50
     forward_gain: float = 0.45
     damping_pitch_from_speed: float = 0.04
     hover_thrust: float = 0.52
     min_thrust: float = 0.30
-    max_thrust: float = 0.78
+    max_thrust: float = 0.86
     search_yaw_rate_rad_s: float = 0.45
     max_roll_rate_rad_s: float = 0.70
     max_pitch_rate_rad_s: float = 0.80
     max_yaw_rate_rad_s: float = 1.20
     target_pass_distance_m: float = 1.4
     far_distance_m: float = 5.5
-    minimum_track_confidence: float = 0.05
+    minimum_track_confidence: float = 0.0
+    vertical_forward_deadband_rad: float = 0.10
+    vertical_forward_suppression_rad: float = 0.55
 
 
 class ReactiveGateController:
@@ -105,6 +107,22 @@ class ReactiveGateController:
 
         # Negative pitch-rate means "push nose down / accelerate forward" for
         # the internal adapter convention. Wire-level adapters own sign checks.
-        pitch_rate = -self.gains.forward_gain * approach * confidence_scale * centered_scale
+        vertical_error = max(
+            0.0,
+            abs(gate.bearing_v_rad) - self.gains.vertical_forward_deadband_rad,
+        )
+        vertical_centered_scale = 1.0 - vertical_error / max(
+            self.gains.vertical_forward_suppression_rad,
+            1e-6,
+        )
+        vertical_centered_scale = float(np.clip(vertical_centered_scale, 0.0, 1.0))
+
+        pitch_rate = (
+            -self.gains.forward_gain
+            * approach
+            * confidence_scale
+            * centered_scale
+            * vertical_centered_scale
+        )
         pitch_rate += speed_damping
         return pitch_rate
