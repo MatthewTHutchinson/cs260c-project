@@ -238,6 +238,33 @@ Validation rule:
 - If the trace enters `detected`/`commit` but the drone flies away or oscillates, the next problem is control sign/gain tuning or FOV-aware navigation.
 - If the baseline solver sees gates poorly, do not treat that as our autonomy result. The baseline uses privileged gate positions and can pitch forward without preserving visual gate centering.
 
+Latest editor audit on 2026-06-01:
+
+- The original spin was a real `FPV_HANDOFF_FAILURE`: the solver ran, but
+  `frame_fresh` was always `0`, no FPV frames were saved, and the controller
+  stayed in its designed yaw-search fallback.
+- The root cause was an Elodin version mismatch. The CLI/editor was `0.17.3`
+  while the Python package was pinned to `elodin==0.17.2`. In `0.17.3`,
+  sensor cameras publish frames automatically to the DB at their configured
+  `fps`; the old manual `render_cameras()` path no longer applies.
+- After upgrading the sibling Elodin harness to `elodin==0.17.3` and sampling
+  `ctx.read_msg("drone.fpv", timestamp=ctx.timestamp)`, a 5 s editor run
+  produced `151` FPV frames against a target of about `149`.
+- The next failure became `CV_DETECTION_FAILURE`: FPV frames reached the
+  solver, but the detector stayed in search because the rendered practice
+  gates are dark saturated blue, not the older orange/yellow demo color.
+- After adding the Elodin blue HSV range, offline inspection of saved editor
+  frames improved from `0/103` usable gate frames to `44/103`, while the
+  synthetic orange demo remained `5/5`.
+- A subsequent live run proved the Betaflight pitch sign was inverted:
+  with detected gates, the drone moved toward negative X while gate 0 is at
+  positive X. The Betaflight adapter now maps internal negative pitch-rate to
+  RC pitch above center.
+- Remaining open issue: repeated editor runs can still produce a bad SITL
+  lifecycle where Betaflight exits or the drone remains disarmed before the
+  solver trace begins. Treat that as a harness lifecycle problem, separate
+  from the camera handoff, detector color, and pitch-sign bugs above.
+
 - `solver/cs260c_pilot.py` now imports the active `algorithm/` package and maps `AutonomousRacingPilot` output to Elodin `RCCommand` without passing world pose into the pilot.
 
 Experimental smoke command from this repo:

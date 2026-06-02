@@ -14,7 +14,7 @@ Usage
 """
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence
 import numpy as np
 
 try:
@@ -45,11 +45,17 @@ class CameraParams:
     height: int = 360
 
 
-# Default colour range for a high-saturation gate highlight.
-# This remains a historical/provisional assumption and should be retuned
-# against the real qualifier visuals.
-_VQ1_HSV_LO = np.array([10,  150, 150], dtype=np.uint8)   # H, S, V lower bound
-_VQ1_HSV_HI = np.array([35,  255, 255], dtype=np.uint8)   # H, S, V upper bound
+# Default colour ranges for high-saturation gate highlights.
+# The orange range keeps the original synthetic/demo detector behavior; the
+# blue range matches the current Elodin practice harness gate material.
+_ORANGE_HSV_LO = np.array([10, 150, 150], dtype=np.uint8)
+_ORANGE_HSV_HI = np.array([35, 255, 255], dtype=np.uint8)
+_ELODIN_BLUE_HSV_LO = np.array([110, 100, 30], dtype=np.uint8)
+_ELODIN_BLUE_HSV_HI = np.array([130, 255, 255], dtype=np.uint8)
+_DEFAULT_HSV_RANGES = (
+    (_ORANGE_HSV_LO, _ORANGE_HSV_HI),
+    (_ELODIN_BLUE_HSV_LO, _ELODIN_BLUE_HSV_HI),
+)
 
 
 class GateDetector:
@@ -60,7 +66,10 @@ class GateDetector:
     gate_physical_width : float
         Known gate width in metres (used for distance estimation via PnP).
     hsv_lo, hsv_hi : array-like
-        HSV colour range for gate highlighting.  Adjust after observing VQ1.
+        Optional single HSV colour range override for gate highlighting.
+    hsv_ranges : sequence of pairs
+        Optional HSV colour ranges. If omitted, orange demo gates and the
+        current Elodin blue gates are both enabled.
     min_contour_area : int
         Minimum pixel area to consider a blob as a gate candidate.
     """
@@ -68,16 +77,29 @@ class GateDetector:
     def __init__(
         self,
         gate_physical_width: float = 1.5,
-        hsv_lo: np.ndarray = _VQ1_HSV_LO,
-        hsv_hi: np.ndarray = _VQ1_HSV_HI,
+        hsv_lo: np.ndarray | None = None,
+        hsv_hi: np.ndarray | None = None,
+        hsv_ranges: Sequence[tuple[np.ndarray, np.ndarray]] | None = None,
         min_contour_area: int = 200,
     ):
         if not _CV2_AVAILABLE:
             raise ImportError("opencv-python is required for GateDetector. "
                               "Install with: pip install opencv-python")
         self.gate_w = gate_physical_width
-        self.hsv_lo = hsv_lo
-        self.hsv_hi = hsv_hi
+        if hsv_ranges is not None:
+            ranges = hsv_ranges
+        elif hsv_lo is not None or hsv_hi is not None:
+            if hsv_lo is None or hsv_hi is None:
+                raise ValueError("hsv_lo and hsv_hi must be provided together")
+            ranges = ((hsv_lo, hsv_hi),)
+        else:
+            ranges = _DEFAULT_HSV_RANGES
+
+        self.hsv_ranges = tuple(
+            (np.asarray(lo, dtype=np.uint8), np.asarray(hi, dtype=np.uint8))
+            for lo, hi in ranges
+        )
+        self.hsv_lo, self.hsv_hi = self.hsv_ranges[0]
         self.min_area = min_contour_area
 
     def detect(
@@ -94,13 +116,7 @@ class GateDetector:
         cam = cam or CameraParams()
 
         # --- colour segmentation ---
-        hsv = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, self.hsv_lo, self.hsv_hi)
-
-        # morphological clean-up
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = self.mask(bgr_frame)
 
         # --- contour extraction ---
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -141,6 +157,18 @@ class GateDetector:
             ))
 
         return sorted(results, key=lambda g: g.distance_est)
+
+    def mask(self, bgr_frame: np.ndarray) -> np.ndarray:
+        """Return a binary mask for all configured gate colour ranges."""
+        hsv = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2HSV)
+        mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
+        for lo, hi in self.hsv_ranges:
+            mask = cv2.bitwise_or(mask, cv2.inRange(hsv, lo, hi))
+
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        return mask
 
     def gate_obs_to_body_frame(
         self,

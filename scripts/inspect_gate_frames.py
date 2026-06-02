@@ -326,8 +326,7 @@ def write_mask(
     out_path: Path,
     detector: GateDetector,
 ) -> None:
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, detector.hsv_lo, detector.hsv_hi)
+    mask = detector.mask(frame)
     cv2.imwrite(str(out_path), mask)
 
 
@@ -337,8 +336,18 @@ def main() -> int:
     parser.add_argument("--demo", action="store_true", help="Run on a synthetic gate frame.")
     parser.add_argument("--demo-frames", type=int, default=1, help="Synthetic demo length.")
     parser.add_argument("--out-dir", type=Path, default=Path("logs/gate_inspection"))
-    parser.add_argument("--hsv-lo", type=parse_hsv, default=parse_hsv("10,150,150"))
-    parser.add_argument("--hsv-hi", type=parse_hsv, default=parse_hsv("35,255,255"))
+    parser.add_argument(
+        "--hsv-lo",
+        type=parse_hsv,
+        default=None,
+        help="Optional single HSV lower bound override, e.g. 10,150,150.",
+    )
+    parser.add_argument(
+        "--hsv-hi",
+        type=parse_hsv,
+        default=None,
+        help="Optional single HSV upper bound override, e.g. 35,255,255.",
+    )
     parser.add_argument("--min-area", type=int, default=200)
     parser.add_argument("--stride", type=int, default=1, help="Keep every Nth video frame.")
     parser.add_argument("--max-frames", type=int, default=0)
@@ -350,6 +359,8 @@ def main() -> int:
         parser.error("--stride must be >= 1")
     if not args.demo and args.source is None:
         parser.error("Provide --source or --demo")
+    if (args.hsv_lo is None) != (args.hsv_hi is None):
+        parser.error("--hsv-lo and --hsv-hi must be provided together")
 
     out_dir = args.out_dir
     overlay_dir = out_dir / "overlays"

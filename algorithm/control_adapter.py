@@ -38,7 +38,10 @@ def to_betaflight_rc_fields(
     """
     throttle = 1000.0 + np.clip(command.thrust_norm, 0.0, 1.0) * throttle_scale
     roll = 1500.0 + command.roll_rate_rad_s * roll_scale
-    pitch = 1500.0 + command.pitch_rate_rad_s * pitch_scale
+    # Betaflight RC pitch is opposite our internal body-rate convention:
+    # internal negative pitch accelerates forward, while RC values above
+    # center command the forward/nose-down direction in this harness.
+    pitch = 1500.0 - command.pitch_rate_rad_s * pitch_scale
     yaw = 1500.0 + command.yaw_rate_rad_s * yaw_scale
 
     return {
