@@ -195,15 +195,28 @@ By default, that wrapper writes an algorithm-only trace here:
 logs/elodin_pilot_trace_editor.csv
 ```
 
+It captures the Elodin/editor terminal output here:
+
+```text
+logs/elodin_editor_stdout.log
+```
+
 It also saves fresh FPV frames here:
 
 ```text
 logs/elodin_fpv_frames/
 ```
 
+By default, the wrapper clears the previous editor trace/frame/log outputs before
+launching so stale files do not get mixed with the current run. Set
+`CLEAR_EDITOR_LOGS=0` if you intentionally want to append a manual debugging
+session without clearing old artifacts.
+
 Run detector inspection on those frames with:
 
 ```bash
+scripts/audit_elodin_editor_run.py
+
 scripts/inspect_gate_frames.py \
   --source logs/elodin_fpv_frames \
   --out-dir logs/gate_inspection_elodin \
@@ -216,6 +229,11 @@ scripts/plot_pilot_trace.py \
 
 Validation rule:
 
+- If `elodin_pilot_trace_editor.csv` is all `search`, `frame_fresh` is always
+  `0`, and `logs/elodin_fpv_frames/` is empty, the solver is not receiving FPV
+  frames from the Elodin editor/render path. Check
+  `logs/elodin_editor_stdout.log` for `[FPV] First frame...`, render-trigger
+  failures, or collect errors before tuning CV.
 - If `elodin_pilot_trace_editor.csv` is mostly `search` while the gate is visibly in `logs/elodin_fpv_frames`, the CV detector is not tuned to the Elodin gate material.
 - If the trace enters `detected`/`commit` but the drone flies away or oscillates, the next problem is control sign/gain tuning or FOV-aware navigation.
 - If the baseline solver sees gates poorly, do not treat that as our autonomy result. The baseline uses privileged gate positions and can pitch forward without preserving visual gate centering.
