@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 
 import numpy as np
 
@@ -15,12 +16,12 @@ class ReactiveControllerGains:
 
     yaw_gain: float = 2.2
     roll_gain: float = 0.35
-    vertical_gain: float = 0.50
-    forward_gain: float = 0.45
+    vertical_gain: float = 0.75
+    forward_gain: float = 0.24
     damping_pitch_from_speed: float = 0.04
     hover_thrust: float = 0.52
     min_thrust: float = 0.30
-    max_thrust: float = 0.86
+    max_thrust: float = 0.95
     search_yaw_rate_rad_s: float = 0.45
     max_roll_rate_rad_s: float = 0.70
     max_pitch_rate_rad_s: float = 0.80
@@ -28,8 +29,9 @@ class ReactiveControllerGains:
     target_pass_distance_m: float = 1.4
     far_distance_m: float = 5.5
     minimum_track_confidence: float = 0.0
-    vertical_forward_deadband_rad: float = 0.10
-    vertical_forward_suppression_rad: float = 0.55
+    vertical_forward_deadband_rad: float = 0.02
+    vertical_forward_suppression_rad: float = 0.16
+    camera_tilt_up_rad: float = math.radians(20.0)
 
 
 class ReactiveGateController:
@@ -63,7 +65,8 @@ class ReactiveGateController:
 
         yaw_rate = self.gains.yaw_gain * gate.bearing_h_rad * confidence_scale
         roll_rate = self.gains.roll_gain * gate.bearing_h_rad * confidence_scale
-        thrust = self.gains.hover_thrust + self.gains.vertical_gain * gate.bearing_v_rad
+        body_elevation_rad = self._body_vertical_bearing(gate)
+        thrust = self.gains.hover_thrust + self.gains.vertical_gain * body_elevation_rad
 
         pitch_rate = self._forward_pitch_rate(gate, telemetry, confidence_scale, centered_scale)
 
@@ -107,9 +110,10 @@ class ReactiveGateController:
 
         # Negative pitch-rate means "push nose down / accelerate forward" for
         # the internal adapter convention. Wire-level adapters own sign checks.
+        body_elevation_rad = self._body_vertical_bearing(gate)
         vertical_error = max(
             0.0,
-            abs(gate.bearing_v_rad) - self.gains.vertical_forward_deadband_rad,
+            abs(body_elevation_rad) - self.gains.vertical_forward_deadband_rad,
         )
         vertical_centered_scale = 1.0 - vertical_error / max(
             self.gains.vertical_forward_suppression_rad,
@@ -126,3 +130,12 @@ class ReactiveGateController:
         )
         pitch_rate += speed_damping
         return pitch_rate
+
+    def _body_vertical_bearing(self, gate: GateEstimate) -> float:
+        """Convert camera-relative vertical bearing into body elevation.
+
+        The FPV detector reports bearing relative to the tilted optical axis.
+        The AGP spec camera points 20 degrees upward, so a gate can appear
+        below image center while still being physically above the drone.
+        """
+        return float(gate.bearing_v_rad + self.gains.camera_tilt_up_rad)

@@ -12,10 +12,21 @@ index 3d426f5..9855d65 100644
      "opencv-python>=4.10.0",
      "pytest>=8.3.0",
 diff --git a/sim/camera.py b/sim/camera.py
-index 28782ce..f031f0a 100644
+index 28782ce..0548059 100644
 --- a/sim/camera.py
 +++ b/sim/camera.py
-@@ -51,9 +51,6 @@ def register(world: el.World, drone: el.EntityId) -> str:
+@@ -38,6 +38,10 @@ CAM_CY = 180.0
+ CAM_FOV_VERT_DEG = 2.0 * math.degrees(math.atan(CAM_CY / CAM_FY))
+ CAM_FOV_HORIZ_DEG = 2.0 * math.degrees(math.atan(CAM_CX / CAM_FX))
+ CAM_TILT_UP_DEG = 20.0
++# Elodin's sensor_camera pitch offset uses the opposite sign from the AGP
++# "camera tilted upward" wording in our ENU/FLU harness. Negative pitch here
++# points the optical axis upward relative to the drone body.
++ELODIN_ROT_OFFSET_PITCH_DEG = -CAM_TILT_UP_DEG
+ TARGET_FPS = 30.0
+
+ CAMERA_NAME = "fpv"
+@@ -51,9 +55,6 @@ def register(world: el.World, drone: el.EntityId) -> str:
      Returns the full DB component name (`drone.fpv`) for use with
      `request_render()` / `collect_frame()` in the post_step callback.
      """
@@ -25,7 +36,7 @@ index 28782ce..f031f0a 100644
      world.sensor_camera(
          entity=drone,
          name=CAMERA_NAME,
-@@ -61,14 +58,15 @@ def register(world: el.World, drone: el.EntityId) -> str:
+@@ -61,14 +62,15 @@ def register(world: el.World, drone: el.EntityId) -> str:
          height=CAM_HEIGHT,
          fov=CAM_FOV_VERT_DEG,
          near=0.02,
@@ -33,7 +44,7 @@ index 28782ce..f031f0a 100644
 +        far=1000.0,
          pos_offset=[0.3,0,0],
 -        look_at_offset=look_at,
-+        rot_offset=[0.0, CAM_TILT_UP_DEG, 0.0],
++        rot_offset=[0.0, ELODIN_ROT_OFFSET_PITCH_DEG, 0.0],
          format="rgba",
          create_frustum=True,
          frustums_color=[0.0, 1.0, 0.4, 0.4],
@@ -43,7 +54,7 @@ index 28782ce..f031f0a 100644
      )
      return DB_NAME
 
-@@ -78,19 +76,23 @@ def render_every_n_ticks(pid_rate_hz: float) -> int:
+@@ -78,19 +80,23 @@ def render_every_n_ticks(pid_rate_hz: float) -> int:
      return max(1, round(pid_rate_hz / TARGET_FPS))
 
 
@@ -324,6 +335,23 @@ index f60ddd1..3f12bfe 100644
 
  if not bridge[0]:
      print("\nNo simulation ticks executed.")
+diff --git a/tests/test_camera_shape.py b/tests/test_camera_shape.py
+index 65c9eac..4c917b1 100644
+--- a/tests/test_camera_shape.py
++++ b/tests/test_camera_shape.py
+@@ -67,9 +67,6 @@ def test_register_attaches_camera_without_errors():
+     assert name == "drone.fpv"
+
+
+-def test_camera_tilt_vector_is_unit():
+-    """Sanity check: the look_at_offset we use should be a unit vector."""
+-    rad = math.radians(fpv_camera.CAM_TILT_UP_DEG)
+-    v = (math.cos(rad), 0.0, math.sin(rad))
+-    mag = math.sqrt(sum(x * x for x in v))
+-    assert abs(mag - 1.0) < 1e-9
++def test_elodin_rot_offset_pitch_sign_matches_upward_tilt():
++    """Elodin's pitch offset sign is opposite the AGP upward-tilt wording."""
++    assert fpv_camera.ELODIN_ROT_OFFSET_PITCH_DEG == -fpv_camera.CAM_TILT_UP_DEG
 diff --git a/uv.lock b/uv.lock
 index ddc6bce..60787d7 100644
 --- a/uv.lock

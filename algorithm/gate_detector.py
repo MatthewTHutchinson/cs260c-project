@@ -8,7 +8,7 @@ competition-ready perception stack.
 
 Usage
 -----
-    detector = GateDetector(gate_physical_width=1.5)  # metres
+    detector = GateDetector(gate_physical_width=2.7)  # visible outer-frame width, metres
     gates = detector.detect(bgr_frame, camera_params)
     # gates: list of GateObservation(bearing_h, bearing_v, distance_est, confidence)
 """
@@ -64,7 +64,7 @@ class GateDetector:
     Parameters
     ----------
     gate_physical_width : float
-        Known gate width in metres (used for distance estimation via PnP).
+        Known visible gate-frame width in metres for apparent-size range.
     hsv_lo, hsv_hi : array-like
         Optional single HSV colour range override for gate highlighting.
     hsv_ranges : sequence of pairs
@@ -76,7 +76,7 @@ class GateDetector:
 
     def __init__(
         self,
-        gate_physical_width: float = 1.5,
+        gate_physical_width: float = 2.7,
         hsv_lo: np.ndarray | None = None,
         hsv_hi: np.ndarray | None = None,
         hsv_ranges: Sequence[tuple[np.ndarray, np.ndarray]] | None = None,

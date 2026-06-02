@@ -12,6 +12,8 @@ from pathlib import Path
 IMAGE_EXTS = {".ppm", ".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"}
 INTERESTING_LOG_TOKENS = (
     "[FPV] First frame",
+    "[GATE]",
+    "[RACE]",
     "[FPV] render",
     "[FPV] collect",
     "[SOLVER] error",
@@ -48,6 +50,8 @@ def interesting_log_lines(path: Path, limit: int = 25) -> list[str]:
     matches: list[str] = []
     for line in path.read_text(errors="replace").splitlines():
         lowered = line.lower()
+        if "bevy.org/learn/errors/b0004" in lowered:
+            continue
         if any(token.lower() in lowered for token in INTERESTING_LOG_TOKENS):
             matches.append(line)
             if len(matches) >= limit:
@@ -55,7 +59,37 @@ def interesting_log_lines(path: Path, limit: int = 25) -> list[str]:
     return matches
 
 
-def classify(rows: list[dict[str, str]], fresh_frames: int, saved_frames: int, modes: Counter[str]) -> str:
+def race_summary(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    summary = None
+    for line in path.read_text(errors="replace").splitlines():
+        if "[RACE]" in line:
+            summary = line
+    return summary
+
+
+def gates_passed(summary: str | None) -> tuple[int, int] | None:
+    if summary is None:
+        return None
+    marker = "gates_passed="
+    if marker not in summary:
+        return None
+    tail = summary.split(marker, 1)[1].split(maxsplit=1)[0]
+    try:
+        passed, total = tail.split("/", 1)
+        return int(passed), int(total)
+    except ValueError:
+        return None
+
+
+def classify(
+    rows: list[dict[str, str]],
+    fresh_frames: int,
+    saved_frames: int,
+    modes: Counter[str],
+    race: tuple[int, int] | None,
+) -> str:
     if not rows:
         return (
             "NO_TRACE: the editor did not produce solver trace rows. It may have "
@@ -77,6 +111,18 @@ def classify(rows: list[dict[str, str]], fresh_frames: int, saved_frames: int, m
         return (
             "CV_DETECTION_FAILURE: FPV frames reached the solver, but the tracker "
             "never left search. Inspect saved frames and detector masks next."
+        )
+
+    if race is not None and race[0] == race[1] and race[1] > 0:
+        return (
+            "COURSE_COMPLETE: the run passed every gate reported by the harness."
+        )
+
+    if race is not None and race[0] > 0:
+        return (
+            "PARTIAL_COURSE_PROGRESS: the tracker and controller passed at least "
+            "one gate. Remaining work is next-gate reacquisition, lateral control, "
+            "or speed/altitude tuning."
         )
 
     if non_search_modes:
@@ -113,13 +159,17 @@ def main() -> None:
 
     rows, modes, fresh_frames = read_trace(args.trace)
     saved_frames = count_frames(args.frame_dir)
-    verdict = classify(rows, fresh_frames, saved_frames, modes)
+    summary = race_summary(args.log)
+    race = gates_passed(summary)
+    verdict = classify(rows, fresh_frames, saved_frames, modes, race)
 
     print(f"trace={args.trace}")
     print(f"trace_rows={len(rows)}")
     print(f"frame_fresh_rows={fresh_frames}")
     print(f"saved_fpv_frames={saved_frames}")
     print(f"modes={dict(modes)}")
+    if summary is not None:
+        print(f"race_summary={summary}")
     if rows:
         print(f"first_tick={rows[0].get('tick', '')}")
         print(f"last_tick={rows[-1].get('tick', '')}")

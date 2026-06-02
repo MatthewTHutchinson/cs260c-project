@@ -290,7 +290,7 @@ Follow-up validation on 2026-06-02:
 - The 4 s run still did not pass gate 0. Trace overlays showed the gate
   climbing off the top edge of the FPV image: first detections were around
   `pixel_y=29.5`, and the last tracked estimate was around `pixel_y=2.0`.
-  This makes the current bottleneck vertical/FOV-aware approach control.
+  At this stage, the bottleneck was vertical/FOV-aware approach control.
 - Controller follow-up after that audit:
   - suppress forward pitch when vertical bearing is large
   - increase climb thrust authority
@@ -304,6 +304,26 @@ Follow-up validation on 2026-06-02:
 - Invalid editor starts can still occur. If the editor log shows Betaflight
   killed, no `logs/elodin_pilot_trace_editor.csv`, and no saved FPV frames,
   discard that run and rerun after cleanup; it is not an algorithm result.
+- Camera-sign audit on 2026-06-02 found that Elodin's `sensor_camera.rot_offset`
+  pitch sign was opposite our original interpretation. AGP's `20` degree upward
+  camera tilt is now represented in the sibling Elodin harness as
+  `ELODIN_ROT_OFFSET_PITCH_DEG = -CAM_TILT_UP_DEG`. Details live in
+  `docs/SIGN_CONVENTION_AUDIT.md`; run `scripts/audit_sign_conventions.py` to
+  repeat the static checks.
+- The same audit found a controller-side vertical sign leak: raw
+  `bearing_v_rad` is camera-relative, not body-relative. The reactive
+  controller now adds the `20` degree camera tilt before using vertical bearing
+  for thrust, so a first gate below the optical center can still command climb
+  when it is physically above the drone.
+- Follow-up completion-first fixes now use the visible outer gate width
+  (`2.7m`) for range, map normalized thrust across the full Betaflight throttle
+  range, and suppress forward pitch while body-elevation error is large. A
+  valid editor run passed gate 0 at `t=6.78s` with position
+  `(10.00, -0.11, 1.44)`.
+- A temporary RC roll/yaw inversion was tested and rejected because it worsened
+  lateral drift. The current remaining harness issue is next-gate reacquisition
+  and lateral control after the first gate, not a confirmed horizontal sign
+  inversion.
 
 - `solver/cs260c_pilot.py` now imports the active `algorithm/` package and maps `AutonomousRacingPilot` output to Elodin `RCCommand` without passing world pose into the pilot.
 

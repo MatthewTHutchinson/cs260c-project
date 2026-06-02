@@ -27,7 +27,7 @@ def to_betaflight_rc_fields(
     roll_scale: float = 350.0,
     pitch_scale: float = 350.0,
     yaw_scale: float = 350.0,
-    throttle_scale: float = 700.0,
+    throttle_scale: float = 1000.0,
     arm: bool = True,
 ) -> dict[str, int]:
     """Map a RacingCommand to generic Betaflight-style RC PWM fields.
