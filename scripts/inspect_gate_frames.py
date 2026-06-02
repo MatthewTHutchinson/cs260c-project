@@ -9,9 +9,27 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import sys
 from pathlib import Path
 from typing import Iterable, Iterator
+
+
+PROJECT_PYTHON = Path(
+    os.environ.get(
+        "PROJECT_PYTHON",
+        "/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python",
+    )
+)
+
+if (
+    os.environ.get("CS260C_NO_PYTHON_REEXEC") != "1"
+    and os.environ.get("CS260C_PYTHON_REEXECED") != "1"
+    and PROJECT_PYTHON.exists()
+    and Path(sys.executable).resolve() != PROJECT_PYTHON.resolve()
+):
+    os.environ["CS260C_PYTHON_REEXECED"] = "1"
+    os.execv(str(PROJECT_PYTHON), [str(PROJECT_PYTHON), *sys.argv])
 
 import cv2
 import numpy as np
@@ -116,7 +134,10 @@ def iter_frames(args: argparse.Namespace) -> Iterator[tuple[int, float, np.ndarr
 
     source = Path(args.source)
     if not source.exists():
-        raise FileNotFoundError(source)
+        raise FileNotFoundError(
+            f"{source} does not exist. If you expected Elodin FPV frames, run "
+            "`scripts/run_elodin_editor.sh` first, then rerun this inspection."
+        )
 
     if source.is_dir() or source.suffix.lower() in IMAGE_EXTS:
         for index, path in enumerate(iter_image_paths(source)):

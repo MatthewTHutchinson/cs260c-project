@@ -24,6 +24,7 @@ Old PyBullet training and track-development material is quarantined under
 
 - `reference/260508_Technical_Spec_0002.pdf`: current formal virtual qualifier technical spec.
 - `reference/common.xml`: MAVLink message schema reference.
+- `reference/vq1_simulator_access_guide_2026-06-01.md`: current VQ1 simulator access and setup guide.
 - `reference/elodin_ai_grand_prix_harness.md`: captured Elodin harness article.
 - `reference/ai_gp_vq1_simulator_search.md`: captured VQ1 simulator search/reference notes.
 - `reference/Gmail - *.pdf`: older downloaded emails kept as historical reference.

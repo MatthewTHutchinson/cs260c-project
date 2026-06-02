@@ -5,7 +5,26 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
+import sys
 from pathlib import Path
+
+
+PROJECT_PYTHON = Path(
+    os.environ.get(
+        "PROJECT_PYTHON",
+        "/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python",
+    )
+)
+
+if (
+    os.environ.get("CS260C_NO_PYTHON_REEXEC") != "1"
+    and os.environ.get("CS260C_PYTHON_REEXECED") != "1"
+    and PROJECT_PYTHON.exists()
+    and Path(sys.executable).resolve() != PROJECT_PYTHON.resolve()
+):
+    os.environ["CS260C_PYTHON_REEXECED"] = "1"
+    os.execv(str(PROJECT_PYTHON), [str(PROJECT_PYTHON), *sys.argv])
 
 import matplotlib.pyplot as plt
 import numpy as np

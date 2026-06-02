@@ -1,12 +1,46 @@
 # VQ1 Access and Windows Setup Runbook
 
-Date: 2026-05-29
+Date: 2026-06-01
 
 ## Situation
 
-VQ1 access is expected to open on Sunday, 2026-05-31.
+VQ1 is live as of the 2026-06-01 simulator access guide.
 
-The simulator is expected to be a downloadable local package, with Windows support and Linux not working according to the April 10 briefing. The first priority is not training. The first priority is to get any valid Windows environment running the simulator, connect to it, and log camera/telemetry/command behavior.
+Current access reference:
+
+```text
+docs/reference/vq1_simulator_access_guide_2026-06-01.md
+```
+
+The simulator is a downloadable local package launched through `FlightSim.exe`. The first priority is not training. The first priority is to get any valid Windows environment running the simulator, connect to it, and log camera/telemetry/command behavior.
+
+## Official VQ1 Access Steps
+
+From the June 1 access guide:
+
+1. Log in to the AI Grand Prix Team Portal.
+2. Open the dashboard and locate Virtual Qualifier 1.
+3. Click `Download Simulator`.
+4. Create the separate simulator account.
+5. Verify the simulator-account email address.
+6. Download and extract the initial package.
+7. Extract both `AIGP_Simulator.zip` and `PyAIPilotExample.zip`.
+8. Launch `AIGP_Simulator/FlightSim.exe`.
+9. Log in inside the simulator.
+10. Open `Active Events`.
+11. Select `AI-GP Virtual Qualifier #1`.
+
+The Python example package includes:
+
+```text
+controller.py
+main.py
+mavlink_rx.py
+requirements.txt
+setup.py
+timesync.py
+vision_rx.py
+```
 
 ## Best Option Ranking
 
@@ -219,4 +253,3 @@ If no physical machine is available, try:
 3. Library HP Windows laptop if install permissions and GPU are adequate.
 
 Do not assume a generic remote Windows desktop can run the simulator until proven.
-
