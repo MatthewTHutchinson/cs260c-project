@@ -195,35 +195,41 @@ The old PyBullet work is now historical context. Elodin is not the official simu
 
 Kicker: `RESULTS`
 
-Title: `The current stack is runnable, inspectable, and ready for real FPV tuning.`
+Title: `The baseline completes simple courses and exposes the next hard problem.`
 
 On-slide:
 
-- Active algorithm package compiles
-- Synthetic sequence exercises detected, commit, tracked, and search modes
-- Elodin no-FPV Betaflight smoke test passes
-- CS260C Elodin solver adapter passes the same smoke test
-- Pilot trace logs mode, confidence, bearing, command, and RC fields
+- Straight / lateral / height-varied local courses: complete
+- 4-gate straight course: complete
+- Circular arc: `2/4` gates before DNF
+- S-curve: `1/5` gates before DNF
+- Failure mode: reactive controller cuts corners without sequence-aware planning
 
 Visual:
 
-- Small table with validation checks
+- Small table from `docs/FINAL_PRESENTATION_RESULTS.md`
+- Optional trace plots:
+  - `assets/presentation/circular_arc_trace.png`
+  - `assets/presentation/s_curve_trace.png`
 
 Speaker note:
 
-The result is not a claimed VQ1 completion yet. The result is a clean, inspectable control stack ready to tune on real simulator frames once VQ1 or the Elodin editor path is available.
+The result is not "solved drone racing." It is a clean baseline with a useful
+failure boundary. It can fly visible forward-progressing gates, but the curved
+and S-shaped tracks expose why the next version needs gate sequencing,
+lookahead, and either a learned policy or model-based trajectory controller.
 
 ## Slide 10: Next Steps
 
 Kicker: `NEXT`
 
-Title: `The next work is tuning on real frames and connecting MAVSDK.`
+Title: `The next work is sequence-aware navigation and stronger perception.`
 
 On-slide:
 
-1. Capture Elodin and VQ1 FPV frames.
-2. Tune detector thresholds and candidate scoring.
-3. Add a small labeled frame set.
+1. Add gate-sequence memory for multiple gates in view.
+2. Add future-gate lookahead for curved tracks.
+3. Improve CV beyond color/contour heuristics.
 4. Implement the MAVSDK attitude-rate adapter.
 5. Use reactive-run logs as data for a compact learned policy.
 

@@ -94,10 +94,29 @@ index 28782ce..0548059 100644
 +    """Read the latest rendered frame from the message log without rendering."""
 +    return _frame_array(ctx.read_msg(name, timestamp=timestamp))
 diff --git a/sim/course.py b/sim/course.py
-index 4a5df72..64e3d7c 100644
+index 4a5df72..5c1265d 100644
 --- a/sim/course.py
 +++ b/sim/course.py
-@@ -50,14 +50,50 @@ class Gate:
+@@ -15,6 +15,7 @@ The drone starts at the ENU origin. The default course places vertical gates
+ straight ahead along +X (East) at hover altitude.
+ """
+
++import math
+ import typing as ty
+ from dataclasses import dataclass, field
+ from typing import Optional, Tuple
+@@ -41,8 +42,8 @@ class Gate:
+
+     `index` is the order in which it must be passed (0 = first).
+     `center` is the world-frame (ENU) position of the gate's center.
+-    `yaw_deg` is reserved for future rotated courses. Today all gates are
+-        vertical hoops whose plane is perpendicular to world X (opening faces +X).
++    `yaw_deg` rotates the gate plane about ENU Z. Zero means the opening faces
++        +X; positive yaw bends the course toward +Y.
+     """
+
+     index: int
+@@ -50,14 +51,67 @@ class Gate:
      yaw_deg: float = 0.0
 
 
@@ -131,11 +150,28 @@ index 4a5df72..64e3d7c 100644
 +    Gate(3, (40.0, 0.0, 1.8)),
 +)
 +
++CIRCULAR_ARC_COURSE: Tuple[Gate, ...] = (
++    Gate(0, (10.0, 0.0, 1.8), yaw_deg=0.0),
++    Gate(1, (18.0, 1.2, 1.8), yaw_deg=8.0),
++    Gate(2, (26.0, 3.6, 1.8), yaw_deg=16.0),
++    Gate(3, (33.5, 7.3, 1.8), yaw_deg=25.0),
++)
++
++S_CURVE_COURSE: Tuple[Gate, ...] = (
++    Gate(0, (10.0, 0.0, 1.8), yaw_deg=0.0),
++    Gate(1, (18.0, 1.4, 1.8), yaw_deg=10.0),
++    Gate(2, (26.0, -1.4, 1.8), yaw_deg=-10.0),
++    Gate(3, (34.0, 1.5, 1.8), yaw_deg=11.0),
++    Gate(4, (42.0, -1.2, 1.8), yaw_deg=-9.0),
++)
++
 +COURSES: dict[str, Tuple[Gate, ...]] = {
 +    "easy": EASY_COURSE,
 +    "lateral_soft": LATERAL_SOFT_COURSE,
 +    "low_high": LOW_HIGH_COURSE,
 +    "four_gate_straight": FOUR_GATE_STRAIGHT_COURSE,
++    "circular_arc": CIRCULAR_ARC_COURSE,
++    "s_curve": S_CURVE_COURSE,
 +}
 +
 +
@@ -150,7 +186,65 @@ index 4a5df72..64e3d7c 100644
  # Index of the LAST gate the drone has crossed; -1 before any pass.
  # external_control so the post_step gate-tracker can write to it.
  LastGatePassed = ty.Annotated[
-@@ -198,6 +234,7 @@ def detect_gate_pass(
+@@ -106,12 +160,10 @@ class GateProgress(el.Archetype):
+ # file just lives in `assets/` and is referenced by name.
+ GATE_ASSET = "gate.glb"
+
+-# Base rotation applied to every gate GLB. The model is authored facing
+-# along its native Y axis; rotating 90° about Y orients the opening to face
+-# +X (East) in our ENU world. Per-gate `Gate.yaw_deg` is currently always 0;
+-# when non-zero yaw enters the courses, it must be composed with this base
+-# rotation inside `schematic_for`.
+-GATE_BASE_ROTATE = "(0.0, 90.0, 0.0)"
++# Base rotation applied to every gate GLB. The model is authored facing along
++# its native Y axis; rotating 90 degrees about Y orients the opening to face +X
++# (East) in our ENU world. Per-gate yaw is then applied about ENU Z.
++GATE_BASE_PITCH_DEG = 90.0
+
+
+ def gate_name(index: int) -> str:
+@@ -164,7 +216,7 @@ def schematic_for(course: Tuple[Gate, ...]) -> str:
+     for g in course:
+         blocks.append(
+             f"    object_3d {gate_name(g.index)}.world_pos {{\n"
+-            f'        glb path="{GATE_ASSET}" rotate="{GATE_BASE_ROTATE}" translate="(0.0, 0.0, 0.0)"\n'
++            f'        glb path="{GATE_ASSET}" rotate="(0.0, {GATE_BASE_PITCH_DEG:.1f}, {g.yaw_deg:.1f})" translate="(0.0, 0.0, 0.0)"\n'
+             f"    }}"
+         )
+     return "\n".join(blocks)
+@@ -179,8 +231,8 @@ def detect_gate_pass(
+     """Return the index of the next gate that was just crossed, else None.
+
+     A pass requires:
+-      - Drone crossed the next-in-order gate's X plane moving forward.
+-      - Crossing point was inside the inner 1.5 x 1.5 square in Y/Z.
++      - Drone crossed the next-in-order gate plane moving forward.
++      - Crossing point was inside the inner 1.5 x 1.5 square.
+     """
+     next_idx = last_gate_passed + 1
+     if next_idx >= len(course):
+@@ -190,14 +242,26 @@ def detect_gate_pass(
+     px, py, pz = prev_pos
+     cx, cy, cz = curr_pos
+     half = GATE_INNER_W / 2.0
+-    if not (px < gx <= cx):
++
++    yaw_rad = math.radians(g.yaw_deg)
++    normal_x = math.cos(yaw_rad)
++    normal_y = math.sin(yaw_rad)
++    tangent_x = -math.sin(yaw_rad)
++    tangent_y = math.cos(yaw_rad)
++
++    prev_plane_dist = (px - gx) * normal_x + (py - gy) * normal_y
++    curr_plane_dist = (cx - gx) * normal_x + (cy - gy) * normal_y
++    if not (prev_plane_dist < 0.0 <= curr_plane_dist):
+         return None
+-    if abs(cy - gy) > half or abs(cz - gz) > GATE_INNER_H / 2.0:
++
++    lateral_dist = (cx - gx) * tangent_x + (cy - gy) * tangent_y
++    if abs(lateral_dist) > half or abs(cz - gz) > GATE_INNER_H / 2.0:
+         return None
+     return next_idx
 
 
  def print_summary(
@@ -158,7 +252,7 @@ index 4a5df72..64e3d7c 100644
      course: Tuple[Gate, ...],
      last_gate_passed: int,
      pass_times: list,
-@@ -217,7 +254,7 @@ def print_summary(
+@@ -217,7 +281,7 @@ def print_summary(
          f"{pass_times[i]:.2f}" if i < n_passed else "--" for i in range(n)
      )
      line = (
@@ -446,6 +540,32 @@ index 65c9eac..4c917b1 100644
 +def test_elodin_rot_offset_pitch_sign_matches_upward_tilt():
 +    """Elodin's pitch offset sign is opposite the AGP upward-tilt wording."""
 +    assert fpv_camera.ELODIN_ROT_OFFSET_PITCH_DEG == -fpv_camera.CAM_TILT_UP_DEG
+diff --git a/tests/test_course.py b/tests/test_course.py
+index 2f937f1..26fc975 100644
+--- a/tests/test_course.py
++++ b/tests/test_course.py
+@@ -41,6 +41,21 @@ def test_x_gate_no_pass_when_already_done():
+     assert detect_gate_pass(gate_x, 0, (4.0, 0.0, 1.5), (6.0, 0.0, 1.5)) is None
+
+
++def test_yawed_gate_pass_centered():
++    gate_y = (Gate(0, (0.0, 5.0, 1.5), yaw_deg=90.0),)
++    assert detect_gate_pass(gate_y, -1, (0.0, 4.0, 1.5), (0.0, 6.0, 1.5)) == 0
++
++
++def test_yawed_gate_no_pass_outside_lateral_axis():
++    gate_y = (Gate(0, (0.0, 5.0, 1.5), yaw_deg=90.0),)
++    assert detect_gate_pass(gate_y, -1, (1.0, 4.0, 1.5), (1.0, 6.0, 1.5)) is None
++
++
++def test_yawed_gate_no_pass_going_backwards():
++    gate_y = (Gate(0, (0.0, 5.0, 1.5), yaw_deg=90.0),)
++    assert detect_gate_pass(gate_y, -1, (0.0, 6.0, 1.5), (0.0, 4.0, 1.5)) is None
++
++
+ def test_pass_on_inner_boundary_y():
+     half = GATE_INNER_W / 2.0
+     # Exactly on the Y boundary should still count (inclusive on the half)
 diff --git a/uv.lock b/uv.lock
 index ddc6bce..60787d7 100644
 --- a/uv.lock
