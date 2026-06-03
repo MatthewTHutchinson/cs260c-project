@@ -83,6 +83,28 @@ def gates_passed(summary: str | None) -> tuple[int, int] | None:
         return None
 
 
+def trace_progress(rows: list[dict[str, str]]) -> dict[str, int] | None:
+    if not rows:
+        return None
+
+    progress: dict[str, int] = {}
+    for key in ("last_gate_passed", "next_gate_index"):
+        values = []
+        for row in rows:
+            raw = row.get(key)
+            if raw in (None, ""):
+                continue
+            try:
+                values.append(int(raw))
+            except ValueError:
+                continue
+        if values:
+            progress[f"latest_{key}"] = values[-1]
+            progress[f"max_{key}"] = max(values)
+
+    return progress or None
+
+
 def classify(
     rows: list[dict[str, str]],
     fresh_frames: int,
@@ -174,6 +196,10 @@ def main() -> None:
         print(f"first_tick={rows[0].get('tick', '')}")
         print(f"last_tick={rows[-1].get('tick', '')}")
         print(f"last_timestamp_s={rows[-1].get('timestamp_s', '')}")
+        progress = trace_progress(rows)
+        if progress is not None:
+            for key, value in progress.items():
+                print(f"{key}={value}")
     print(f"verdict={verdict}")
 
     log_lines = interesting_log_lines(args.log)

@@ -324,6 +324,20 @@ Follow-up validation on 2026-06-02:
   lateral drift. The current remaining harness issue is next-gate reacquisition
   and lateral control after the first gate, not a confirmed horizontal sign
   inversion.
+- Additional post-pass tracker hacks were tested and rejected. Filtering for
+  only far detections after gate 0 still missed gate 1, and a synthetic
+  straight-ahead recovery estimate made lateral drift worse. Keep these as
+  negative results: the next useful iteration should redesign lateral
+  control/reacquisition with a controlled test, not hide stale old-gate blobs
+  behind a tracker-only heuristic.
+- `solver/cs260c_pilot.py` now writes `last_gate_passed` and
+  `next_gate_index` into the trace so partial-course progress can be separated
+  from detector/controller mode changes.
+- A fresh 10 s editor validation after backing out the rejected tracker hacks
+  produced `303` FPV frames against a target of about `299`, passed gate 0 at
+  `t=6.77s`, and ended `1/3` with trace progress
+  `latest_last_gate_passed=0`, `latest_next_gate_index=1`. The current verdict
+  from `scripts/audit_elodin_editor_run.py` is `PARTIAL_COURSE_PROGRESS`.
 
 - `solver/cs260c_pilot.py` now imports the active `algorithm/` package and maps `AutonomousRacingPilot` output to Elodin `RCCommand` without passing world pose into the pilot.
 

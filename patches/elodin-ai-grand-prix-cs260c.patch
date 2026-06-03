@@ -1326,10 +1326,10 @@ index ddc6bce..60787d7 100644
  ]
 diff --git a/solver/cs260c_pilot.py b/solver/cs260c_pilot.py
 new file mode 100644
-index 0000000..77a0e75
+index 0000000..4a0b2b7
 --- /dev/null
 +++ b/solver/cs260c_pilot.py
-@@ -0,0 +1,239 @@
+@@ -0,0 +1,247 @@
 +"""CS 260C perception-guided racing pilot for the Elodin harness.
 +
 +This solver deliberately ignores Elodin's world pose. It consumes only the FPV
@@ -1401,6 +1401,8 @@ index 0000000..77a0e75
 +            "tick",
 +            "timestamp_s",
 +            "frame_fresh",
++            "last_gate_passed",
++            "next_gate_index",
 +            "mode",
 +            "confidence",
 +            "bearing_h_rad",
@@ -1456,6 +1458,8 @@ index 0000000..77a0e75
 +            "tick": int(update.tick),
 +            "timestamp_s": f"{float(update.t):.6f}",
 +            "frame_fresh": int(bool(update.frame_fresh)),
++            "last_gate_passed": int(update.last_gate_passed),
++            "next_gate_index": int(update.next_gate_index),
 +            "mode": gate.mode.value,
 +            "confidence": f"{gate.confidence:.6f}",
 +            "bearing_h_rad": f"{gate.bearing_h_rad:.6f}",
@@ -1521,6 +1525,10 @@ index 0000000..77a0e75
 +        angular_rates_rad_s=np.asarray(update.gyro, dtype=np.float64),
 +        acceleration_m_s2=np.asarray(update.accel, dtype=np.float64),
 +        timestamp_s=float(update.t),
++        status_flags={
++            "last_gate_passed": int(update.last_gate_passed),
++            "next_gate_index": int(update.next_gate_index),
++        },
 +    )
 +
 +
