@@ -338,6 +338,20 @@ Follow-up validation on 2026-06-02:
   `t=6.77s`, and ended `1/3` with trace progress
   `latest_last_gate_passed=0`, `latest_next_gate_index=1`. The current verdict
   from `scripts/audit_elodin_editor_run.py` is `PARTIAL_COURSE_PROGRESS`.
+- The next controlled audit found that the post-gate trace was not a yaw/roll
+  sign problem: yaw and roll were aligned with horizontal bearing, but post-gate
+  pitch was exactly zero. A broad attempt to loosen vertical forward
+  suppression globally was rejected because it missed gate 0 low
+  (`latest_last_gate_passed=-1`). A full attitude-corrected thrust attempt was
+  also rejected because it reduced first-gate climb too much.
+- The accepted controller change uses attitude/orientation only for forward
+  suppression while keeping climb thrust body/camera-relative. This preserves
+  first-gate climb but allows forward authority when the gate is centered in
+  the tilted FPV image while the drone is pitched down.
+- Latest 12 s editor validation completed the local easy course:
+  `gates_passed=3/3`, lap time `7.55s`, pass times `[4.90, 6.30, 7.55]`,
+  `363` FPV frames against a target of about `359`, and
+  `scripts/audit_elodin_editor_run.py` verdict `COURSE_COMPLETE`.
 
 - `solver/cs260c_pilot.py` now imports the active `algorithm/` package and maps `AutonomousRacingPilot` output to Elodin `RCCommand` without passing world pose into the pilot.
 

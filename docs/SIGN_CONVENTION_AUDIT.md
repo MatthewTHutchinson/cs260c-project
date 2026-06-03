@@ -106,7 +106,7 @@ Audit result:
 - internal `pitch=-0.25` maps to `rc_pitch > 1500`
 - internal `pitch=+0.25` maps to `rc_pitch < 1500`
 
-## Remaining Unknowns
+## Horizontal / Reacquisition Follow-Up
 
 Yaw and roll are not currently treated as sign-flipped. A temporary Betaflight
 RC roll/yaw inversion was tested and rejected because it amplified lateral
@@ -114,14 +114,25 @@ error badly (`y=-2.98m` by `t=5s` in the short editor run). The remaining
 horizontal problem appears to be lateral control/target-selection quality, not a
 confirmed wire-sign inversion.
 
-The next controlled horizontal audit should use an intentionally offset gate or
-synthetic course:
+The controlled horizontal audit now lives in:
+
+```bash
+scripts/audit_lateral_reacquisition.py
+```
+
+It checks:
 
 - gate appears right of center -> yaw/roll command should rotate/translate
   toward the right-side bearing rather than away from it
 - gate appears left of center -> command signs should mirror
-- after passing gate 0, the tracker should reacquire gate 1 rather than
-  overreact to the nearby gate frame or stale target
+- a pitched-down optical-center reacquisition gate should retain forward pitch
+  instead of freezing because of the camera's `20` degree upward mount
+
+This audit found the key post-gate bug: after gate 0, yaw/roll were already
+aligned with the detected bearing, but forward pitch was zero. The accepted fix
+uses attitude/orientation for forward suppression while keeping climb thrust
+body/camera-relative. A live editor run after that change completed all three
+Elodin practice gates: `[4.90, 6.30, 7.55]`.
 
 ## Repeatable Audit Command
 

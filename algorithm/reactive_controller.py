@@ -7,6 +7,7 @@ import math
 
 import numpy as np
 
+from algorithm.frames import body_forward_elevation_from_quat_xyzw
 from algorithm.types import GateEstimate, RacingCommand, TrackMode, VehicleTelemetry
 
 
@@ -110,10 +111,13 @@ class ReactiveGateController:
 
         # Negative pitch-rate means "push nose down / accelerate forward" for
         # the internal adapter convention. Wire-level adapters own sign checks.
-        body_elevation_rad = self._body_vertical_bearing(gate)
+        # Forward suppression uses an earth-relative vertical cue when attitude
+        # is available. Thrust stays body/camera-relative so the first gate
+        # still gets conservative climb authority while it is low in the FPV.
+        vertical_control_rad = self._forward_vertical_bearing(gate, telemetry)
         vertical_error = max(
             0.0,
-            abs(body_elevation_rad) - self.gains.vertical_forward_deadband_rad,
+            abs(vertical_control_rad) - self.gains.vertical_forward_deadband_rad,
         )
         vertical_centered_scale = 1.0 - vertical_error / max(
             self.gains.vertical_forward_suppression_rad,
@@ -139,3 +143,18 @@ class ReactiveGateController:
         below image center while still being physically above the drone.
         """
         return float(gate.bearing_v_rad + self.gains.camera_tilt_up_rad)
+
+    def _forward_vertical_bearing(
+        self,
+        gate: GateEstimate,
+        telemetry: VehicleTelemetry,
+    ) -> float:
+        body_elevation = self._body_vertical_bearing(gate)
+        if telemetry.rpy_rad is not None and len(telemetry.rpy_rad) >= 2:
+            return float(body_elevation + telemetry.rpy_rad[1])
+        if telemetry.attitude_quat is not None and len(telemetry.attitude_quat) >= 4:
+            return float(
+                body_elevation
+                + body_forward_elevation_from_quat_xyzw(telemetry.attitude_quat)
+            )
+        return body_elevation

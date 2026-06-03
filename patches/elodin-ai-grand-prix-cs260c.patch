@@ -1326,10 +1326,10 @@ index ddc6bce..60787d7 100644
  ]
 diff --git a/solver/cs260c_pilot.py b/solver/cs260c_pilot.py
 new file mode 100644
-index 0000000..4a0b2b7
+index 0000000..ad20bab
 --- /dev/null
 +++ b/solver/cs260c_pilot.py
-@@ -0,0 +1,247 @@
+@@ -0,0 +1,263 @@
 +"""CS 260C perception-guided racing pilot for the Elodin harness.
 +
 +This solver deliberately ignores Elodin's world pose. It consumes only the FPV
@@ -1356,6 +1356,7 @@ index 0000000..4a0b2b7
 +
 +from algorithm import AutonomousRacingPilot, VehicleTelemetry  # noqa: E402
 +from algorithm.control_adapter import to_betaflight_rc_fields  # noqa: E402
++from algorithm.frames import body_forward_elevation_from_quat_xyzw  # noqa: E402
 +
 +
 +T_DISARMED_END = 0.50
@@ -1403,6 +1404,7 @@ index 0000000..4a0b2b7
 +            "frame_fresh",
 +            "last_gate_passed",
 +            "next_gate_index",
++            "body_forward_elevation_rad",
 +            "mode",
 +            "confidence",
 +            "bearing_h_rad",
@@ -1453,6 +1455,11 @@ index 0000000..4a0b2b7
 +    if not update.frame_fresh and update.tick % 20 != 0:
 +        return
 +
++    attitude_quat = _attitude_quat(update)
++    body_forward_elevation = ""
++    if attitude_quat is not None:
++        body_forward_elevation = f"{body_forward_elevation_from_quat_xyzw(attitude_quat):.6f}"
++
 +    writer.writerow(
 +        {
 +            "tick": int(update.tick),
@@ -1460,6 +1467,7 @@ index 0000000..4a0b2b7
 +            "frame_fresh": int(bool(update.frame_fresh)),
 +            "last_gate_passed": int(update.last_gate_passed),
 +            "next_gate_index": int(update.next_gate_index),
++            "body_forward_elevation_rad": body_forward_elevation,
 +            "mode": gate.mode.value,
 +            "confidence": f"{gate.confidence:.6f}",
 +            "bearing_h_rad": f"{gate.bearing_h_rad:.6f}",
@@ -1520,8 +1528,16 @@ index 0000000..4a0b2b7
 +    _frame_save_count += 1
 +
 +
++def _attitude_quat(update: SensorUpdate) -> np.ndarray | None:
++    world_pos = np.asarray(update.world_pos, dtype=np.float64)
++    if world_pos.size < 4:
++        return None
++    return np.ascontiguousarray(world_pos[:4])
++
++
 +def _telemetry(update: SensorUpdate) -> VehicleTelemetry:
 +    return VehicleTelemetry(
++        attitude_quat=_attitude_quat(update),
 +        angular_rates_rad_s=np.asarray(update.gyro, dtype=np.float64),
 +        acceleration_m_s2=np.asarray(update.accel, dtype=np.float64),
 +        timestamp_s=float(update.t),

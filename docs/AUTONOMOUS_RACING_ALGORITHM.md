@@ -109,6 +109,14 @@ thrust     = hover_thrust + k_vertical * vertical_gate_bearing
 pitch_rate = forward approach command from gate range/size/confidence
 ```
 
+The vertical terms now deliberately use two different cues:
+
+- climb/thrust remains conservative and camera/body-relative, so the first gate
+  still gets enough climb authority while it is low in the FPV image
+- forward suppression uses attitude/orientation when available, so a gate
+  centered in the upward-tilted camera while the drone is pitched down can still
+  receive forward authority during post-gate reacquisition
+
 If the gate is not usable, the drone enters search:
 
 ```text
