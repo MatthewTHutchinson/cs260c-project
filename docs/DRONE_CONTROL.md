@@ -106,6 +106,7 @@ gate horizontal error -> yaw_rate
 gate vertical error   -> thrust trim
 gate size/confidence  -> pitch/forward aggressiveness
 lateral image drift   -> roll_rate or yaw-first correction
+detection loss        -> level/settle/brake, then yaw scan
 ```
 
 ### Option B: Offboard Attitude + Thrust

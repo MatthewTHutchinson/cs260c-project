@@ -259,7 +259,7 @@ Available local validation courses in the sibling harness patch:
 - `lateral_soft`: small lateral offsets after gate 0
 - `low_high`: modest gate-height variation after gate 0
 - `four_gate_straight`: longer straight-line completion check
-- `circular_arc`: four yawed gates on a gentle left-turning arc
+- `circular` / `circular_arc`: four yawed gates on a gentle left-turning arc
 - `s_curve`: five yawed gates with linked left/right lateral wiggles
 
 Run a suite with:
@@ -285,8 +285,14 @@ current classical detector/reactive controller.
 Run the hard presentation stress suite with:
 
 ```bash
+scripts/run_elodin_challenge_suite.sh
+```
+
+Equivalent explicit command:
+
+```bash
 scripts/run_elodin_course_suite.py \
-  --courses circular_arc,s_curve \
+  --courses circular,s_curve \
   --out-dir logs/elodin_hard_track_results \
   --sim-time 16 \
   --timeout-s 360 \

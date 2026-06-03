@@ -208,6 +208,26 @@ After VQ1 completion is reliable, add:
 
 Do not start here. VQ1 success is a reliable gate-order navigation problem first.
 
+## Controller Redesign Note
+
+The proportional visual-servo controller is not robust enough for circular and
+S-shaped courses. A quick bounded-gain experiment made even the straight
+`easy` course worse, which is a useful result: the next improvement should not
+be another hand-shaped image-error curve.
+
+The better next method is:
+
+```text
+GateTracker sequence state
+  -> local gate-passage state machine
+  -> short-horizon body-frame waypoint or corridor target
+  -> attitude-rate/thrust tracking
+```
+
+That gives navigation a notion of "turn toward the next corridor" instead of
+asking the low-level controller to infer course geometry from the current gate
+center alone.
+
 ## Immediate Tasks
 
 1. Implement the navigation state machine.

@@ -26,6 +26,13 @@ class ReactiveControllerGains:
     max_thrust: float = 0.95
     search_settle_s: float = 0.75
     search_yaw_rate_rad_s: float = 0.45
+    search_pitch_level_gain: float = 0.90
+    search_max_pitch_level_rate_rad_s: float = 0.35
+    search_level_tolerance_rad: float = 0.05
+    search_forward_velocity_damping: float = 0.07
+    search_lateral_velocity_damping: float = 0.18
+    search_max_velocity_brake_rate_rad_s: float = 0.25
+    search_velocity_settle_m_s: float = 0.45
     max_roll_rate_rad_s: float = 0.70
     max_pitch_rate_rad_s: float = 0.80
     max_yaw_rate_rad_s: float = 1.20
@@ -58,26 +65,7 @@ class ReactiveGateController:
         telemetry = telemetry or VehicleTelemetry()
 
         if not gate.is_usable or gate.confidence < self.gains.minimum_track_confidence:
-            now_s = self._timestamp_s(telemetry)
-            if self._search_started_s is None:
-                self._search_started_s = now_s
-            search_elapsed_s = max(0.0, now_s - self._search_started_s)
-            yaw_rate = (
-                0.0
-                if search_elapsed_s < self.gains.search_settle_s
-                else self.gains.search_yaw_rate_rad_s
-            )
-            return RacingCommand(
-                yaw_rate_rad_s=yaw_rate,
-                thrust_norm=self.gains.hover_thrust,
-                mode=TrackMode.SEARCH,
-            ).clipped(
-                self.gains.max_roll_rate_rad_s,
-                self.gains.max_pitch_rate_rad_s,
-                self.gains.max_yaw_rate_rad_s,
-                self.gains.min_thrust,
-                self.gains.max_thrust,
-            )
+            return self._search_command(telemetry)
 
         self._search_started_s = None
 
@@ -112,6 +100,91 @@ class ReactiveGateController:
             self.gains.min_thrust,
             self.gains.max_thrust,
         )
+
+    def _search_command(self, telemetry: VehicleTelemetry) -> RacingCommand:
+        now_s = self._timestamp_s(telemetry)
+        if self._search_started_s is None:
+            self._search_started_s = now_s
+        search_elapsed_s = max(0.0, now_s - self._search_started_s)
+
+        pitch_level_rate = self._search_pitch_level_rate(telemetry)
+        roll_brake_rate, pitch_brake_rate = self._search_velocity_brake_rates(telemetry)
+        pitch_rate = pitch_level_rate + pitch_brake_rate
+        is_level = (
+            abs(self._body_forward_elevation(telemetry))
+            <= self.gains.search_level_tolerance_rad
+        )
+        is_settled = self._search_velocity_is_settled(telemetry)
+        yaw_rate = (
+            self.gains.search_yaw_rate_rad_s
+            if search_elapsed_s >= self.gains.search_settle_s and is_level and is_settled
+            else 0.0
+        )
+
+        return RacingCommand(
+            roll_rate_rad_s=roll_brake_rate,
+            pitch_rate_rad_s=pitch_rate,
+            yaw_rate_rad_s=yaw_rate,
+            thrust_norm=self.gains.hover_thrust,
+            mode=TrackMode.SEARCH,
+        ).clipped(
+            self.gains.max_roll_rate_rad_s,
+            self.gains.max_pitch_rate_rad_s,
+            self.gains.max_yaw_rate_rad_s,
+            self.gains.min_thrust,
+            self.gains.max_thrust,
+        )
+
+    def _search_pitch_level_rate(self, telemetry: VehicleTelemetry) -> float:
+        body_elevation = self._body_forward_elevation(telemetry)
+        if abs(body_elevation) <= self.gains.search_level_tolerance_rad:
+            return 0.0
+        return float(
+            np.clip(
+                -self.gains.search_pitch_level_gain * body_elevation,
+                -self.gains.search_max_pitch_level_rate_rad_s,
+                self.gains.search_max_pitch_level_rate_rad_s,
+            )
+        )
+
+    def _search_velocity_brake_rates(
+        self,
+        telemetry: VehicleTelemetry,
+    ) -> tuple[float, float]:
+        body_velocity = telemetry.linear_velocity_m_s
+        if body_velocity is None:
+            return 0.0, 0.0
+
+        velocity = np.asarray(body_velocity, dtype=np.float64)
+        forward_v = float(velocity[0]) if velocity.size >= 1 else 0.0
+        lateral_v = float(velocity[1]) if velocity.size >= 2 else 0.0
+        limit = self.gains.search_max_velocity_brake_rate_rad_s
+
+        # Internal convention: positive pitch-rate pitches up / brakes forward
+        # flight; positive roll-rate rolls right, so it is opposite lateral
+        # body velocity when damping drift.
+        pitch_rate = np.clip(
+            self.gains.search_forward_velocity_damping * forward_v,
+            -limit,
+            limit,
+        )
+        roll_rate = np.clip(
+            -self.gains.search_lateral_velocity_damping * lateral_v,
+            -limit,
+            limit,
+        )
+        return float(roll_rate), float(pitch_rate)
+
+    def _search_velocity_is_settled(self, telemetry: VehicleTelemetry) -> bool:
+        body_velocity = telemetry.linear_velocity_m_s
+        if body_velocity is None:
+            return True
+
+        velocity = np.asarray(body_velocity, dtype=np.float64)
+        if velocity.size == 0:
+            return True
+        horizontal = velocity[: min(2, velocity.size)]
+        return float(np.linalg.norm(horizontal)) <= self.gains.search_velocity_settle_m_s
 
     def _forward_pitch_rate(
         self,
@@ -182,6 +255,13 @@ class ReactiveGateController:
                 + body_forward_elevation_from_quat_xyzw(telemetry.attitude_quat)
             )
         return body_elevation
+
+    def _body_forward_elevation(self, telemetry: VehicleTelemetry) -> float:
+        if telemetry.rpy_rad is not None and len(telemetry.rpy_rad) >= 2:
+            return float(telemetry.rpy_rad[1])
+        if telemetry.attitude_quat is not None and len(telemetry.attitude_quat) >= 4:
+            return body_forward_elevation_from_quat_xyzw(telemetry.attitude_quat)
+        return 0.0
 
     @staticmethod
     def _timestamp_s(telemetry: VehicleTelemetry) -> float:

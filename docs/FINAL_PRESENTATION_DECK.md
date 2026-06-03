@@ -106,7 +106,7 @@ On-slide:
 - Center the gate during approach
 - Commit near the gate instead of dithering
 - Use short-term memory after detection loss
-- Fall back to deliberate yaw search
+- Fall back to level/brake/yaw search
 
 Visual:
 
@@ -115,7 +115,7 @@ Visual:
 
 Speaker note:
 
-In `commit`, the gate is close and centered, so commands become small and steady. After loss, the tracker briefly holds the last estimate; once confidence expires, the autopilot switches to search yaw.
+In `commit`, the gate is close and centered, so commands become small and steady. After loss, the tracker briefly holds the last estimate; once confidence expires, the autopilot levels, damps body-frame drift when velocity is available, and only then starts a yaw search.
 
 ## Slide 6: Control Law
 
@@ -133,7 +133,7 @@ pitch_rate <- range and confidence
 ```
 
 - Commands are clipped before leaving the algorithm
-- Search mode commands a slow yaw scan
+- Search mode levels and brakes before a slow yaw scan
 
 Visual:
 

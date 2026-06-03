@@ -90,7 +90,8 @@ Current navigation is a visual-servo controller, not a learned policy:
 
 Control modes:
 
-- `search`: hover/settle first, then slow yaw scan with no roll or pitch command.
+- `search`: hover/settle, level, brake body velocity when available, then slow
+  yaw scan only once level and settled.
 - `detected`: current-frame gate target.
 - `tracked`: short-memory target during brief detector drops.
 - `commit`: continue through a near gate with damped lateral/yaw correction
@@ -121,14 +122,24 @@ scripts/run_elodin_editor.sh
 scripts/run_elodin_course_suite.py --courses easy,lateral_soft,low_high,four_gate_straight
 ```
 
-Latest local validation after distance-aware sequence selection, 2026-06-03:
+Latest local validation after search level/brake fix, 2026-06-03:
 
 ```text
-easy: COMPLETE gates=3/3 lap_time=7.58
-lateral_soft: COMPLETE gates=3/3 lap_time=7.53
-low_high: COMPLETE gates=3/3 lap_time=7.41
-four_gate_straight: COMPLETE gates=4/4 lap_time=8.55
+easy: COMPLETE gates=3/3 lap_time=7.57
+lateral_soft: COMPLETE gates=3/3 lap_time=7.61
+low_high: COMPLETE gates=3/3 lap_time=7.36
+four_gate_straight: COMPLETE gates=4/4 lap_time=8.54
+circular: DNF gates=2/4 lap_time=16.00
 ```
+
+Challenge tracks:
+
+```bash
+scripts/run_elodin_challenge_suite.sh
+```
+
+This runs `circular`/`circular_arc` and `s_curve`, which are intended to expose
+the current lack of lookahead/trajectory planning.
 
 ## Validation Commands
 

@@ -69,6 +69,12 @@ scripts/run_elodin_editor.sh
 
 The smoke wrapper intentionally avoids camera rendering.
 
+Run the circular/S-curve stress tracks:
+
+```bash
+scripts/run_elodin_challenge_suite.sh
+```
+
 Inspect detector/controller behavior on images, videos, or a synthetic gate demo:
 
 ```bash
@@ -120,7 +126,7 @@ On this machine, the known-good project interpreter is:
 Validate active code:
 
 ```bash
-/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m py_compile algorithm/*.py
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m py_compile algorithm/*.py scripts/*.py
 /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python scripts/audit_sequence_selection.py
 ```
 

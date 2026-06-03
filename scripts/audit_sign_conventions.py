@@ -11,6 +11,8 @@ import re
 import sys
 from pathlib import Path
 
+import numpy as np
+
 
 PROJECT_PYTHON = Path(
     os.environ.get(
@@ -162,6 +164,21 @@ def main() -> int:
         search_gate,
         VehicleTelemetry(timestamp_s=1.0 + controller.gains.search_settle_s + 0.1),
     )
+    pitched_search_cmd = controller.compute(
+        search_gate,
+        VehicleTelemetry(
+            rpy_rad=np.array([0.0, -0.25, 0.0]),
+            timestamp_s=1.0 + controller.gains.search_settle_s + 0.2,
+        ),
+    )
+    moving_search_cmd = controller.compute(
+        search_gate,
+        VehicleTelemetry(
+            rpy_rad=np.array([0.0, 0.0, 0.0]),
+            linear_velocity_m_s=np.array([2.5, 1.0, 0.0]),
+            timestamp_s=1.0 + controller.gains.search_settle_s + 0.3,
+        ),
+    )
 
     observed = first_non_search(args.trace)
 
@@ -220,6 +237,19 @@ def main() -> int:
         f"pitch={search_scan_cmd.pitch_rate_rad_s:.3f} "
         f"thrust={search_scan_cmd.thrust_norm:.3f}"
     )
+    print(
+        "pitched_search_command="
+        f"pitch={pitched_search_cmd.pitch_rate_rad_s:.3f} "
+        f"yaw={pitched_search_cmd.yaw_rate_rad_s:.3f} "
+        f"thrust={pitched_search_cmd.thrust_norm:.3f}"
+    )
+    print(
+        "moving_search_command="
+        f"roll={moving_search_cmd.roll_rate_rad_s:.3f} "
+        f"pitch={moving_search_cmd.pitch_rate_rad_s:.3f} "
+        f"yaw={moving_search_cmd.yaw_rate_rad_s:.3f} "
+        f"thrust={moving_search_cmd.thrust_norm:.3f}"
+    )
 
     failures = []
     if "CAM_TILT_UP_DEG" not in elodin_pitch_offset(args.elodin_camera):
@@ -251,6 +281,16 @@ def main() -> int:
         or abs(search_scan_cmd.pitch_rate_rad_s) > 1e-9
     ):
         failures.append("search scan should not command roll or pitch")
+    if pitched_search_cmd.pitch_rate_rad_s <= 0.0:
+        failures.append("pitched-down search should command positive pitch-rate to level")
+    if abs(pitched_search_cmd.yaw_rate_rad_s) > 1e-9:
+        failures.append("pitched search should level before starting yaw scan")
+    if moving_search_cmd.pitch_rate_rad_s <= 0.0:
+        failures.append("forward search drift should command positive pitch-rate braking")
+    if moving_search_cmd.roll_rate_rad_s >= 0.0:
+        failures.append("rightward search drift should command negative roll-rate braking")
+    if abs(moving_search_cmd.yaw_rate_rad_s) > 1e-9:
+        failures.append("moving search should brake before starting yaw scan")
 
     if failures:
         print("verdict=FAIL")

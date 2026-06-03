@@ -219,7 +219,7 @@ index 28782ce..08a87db 100644
 +    """Read the latest rendered frame from the message log without rendering."""
 +    return _frame_array(ctx.read_msg(name, timestamp=timestamp))
 diff --git a/sim/course.py b/sim/course.py
-index 4a5df72..5c1265d 100644
+index 4a5df72..13b9dbe 100644
 --- a/sim/course.py
 +++ b/sim/course.py
 @@ -15,6 +15,7 @@ The drone starts at the ENU origin. The default course places vertical gates
@@ -295,6 +295,7 @@ index 4a5df72..5c1265d 100644
 +    "lateral_soft": LATERAL_SOFT_COURSE,
 +    "low_high": LOW_HIGH_COURSE,
 +    "four_gate_straight": FOUR_GATE_STRAIGHT_COURSE,
++    "circular": CIRCULAR_ARC_COURSE,
 +    "circular_arc": CIRCULAR_ARC_COURSE,
 +    "s_curve": S_CURVE_COURSE,
 +}
@@ -1705,10 +1706,10 @@ index ddc6bce..60787d7 100644
  ]
 diff --git a/solver/cs260c_pilot.py b/solver/cs260c_pilot.py
 new file mode 100644
-index 0000000..26504a8
+index 0000000..c3cee00
 --- /dev/null
 +++ b/solver/cs260c_pilot.py
-@@ -0,0 +1,297 @@
+@@ -0,0 +1,317 @@
 +"""CS 260C perception-guided racing pilot for the Elodin harness.
 +
 +This solver deliberately ignores Elodin's world pose. It consumes only the FPV
@@ -1742,7 +1743,10 @@ index 0000000..26504a8
 +    get_camera_profile,
 +)
 +from algorithm.control_adapter import to_betaflight_rc_fields  # noqa: E402
-+from algorithm.frames import body_forward_elevation_from_quat_xyzw  # noqa: E402
++from algorithm.frames import (  # noqa: E402
++    body_forward_elevation_from_quat_xyzw,
++    body_velocity_from_world_velocity_quat_xyzw,
++)
 +from algorithm.reactive_controller import ReactiveControllerGains, ReactiveGateController  # noqa: E402
 +
 +
@@ -1759,6 +1763,7 @@ index 0000000..26504a8
 +    controller = ReactiveGateController(
 +        ReactiveControllerGains(
 +            camera_tilt_up_rad=math.radians(profile.tilt_up_deg),
++            damping_pitch_from_speed=0.0,
 +        )
 +    )
 +    print(
@@ -1818,6 +1823,9 @@ index 0000000..26504a8
 +            "last_gate_passed",
 +            "next_gate_index",
 +            "body_forward_elevation_rad",
++            "body_vx_m_s",
++            "body_vy_m_s",
++            "body_vz_m_s",
 +            "mode",
 +            "confidence",
 +            "bearing_h_rad",
@@ -1872,6 +1880,7 @@ index 0000000..26504a8
 +    body_forward_elevation = ""
 +    if attitude_quat is not None:
 +        body_forward_elevation = f"{body_forward_elevation_from_quat_xyzw(attitude_quat):.6f}"
++    body_velocity = _body_linear_velocity(update)
 +
 +    writer.writerow(
 +        {
@@ -1881,6 +1890,9 @@ index 0000000..26504a8
 +            "last_gate_passed": int(update.last_gate_passed),
 +            "next_gate_index": int(update.next_gate_index),
 +            "body_forward_elevation_rad": body_forward_elevation,
++            "body_vx_m_s": "" if body_velocity is None else f"{body_velocity[0]:.6f}",
++            "body_vy_m_s": "" if body_velocity is None else f"{body_velocity[1]:.6f}",
++            "body_vz_m_s": "" if body_velocity is None else f"{body_velocity[2]:.6f}",
 +            "mode": gate.mode.value,
 +            "confidence": f"{gate.confidence:.6f}",
 +            "bearing_h_rad": f"{gate.bearing_h_rad:.6f}",
@@ -1948,10 +1960,19 @@ index 0000000..26504a8
 +    return np.ascontiguousarray(world_pos[:4])
 +
 +
++def _body_linear_velocity(update: SensorUpdate) -> np.ndarray | None:
++    world_vel = np.asarray(update.world_vel, dtype=np.float64)
++    attitude_quat = _attitude_quat(update)
++    if attitude_quat is None or world_vel.size < 6:
++        return None
++    return body_velocity_from_world_velocity_quat_xyzw(world_vel[3:6], attitude_quat)
++
++
 +def _telemetry(update: SensorUpdate) -> VehicleTelemetry:
 +    return VehicleTelemetry(
 +        attitude_quat=_attitude_quat(update),
 +        angular_rates_rad_s=np.asarray(update.gyro, dtype=np.float64),
++        linear_velocity_m_s=_body_linear_velocity(update),
 +        acceleration_m_s2=np.asarray(update.accel, dtype=np.float64),
 +        timestamp_s=float(update.t),
 +        status_flags={

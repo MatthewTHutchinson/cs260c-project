@@ -158,6 +158,11 @@ thrust     = hover_thrust + k_vertical * vertical_gate_bearing
 pitch_rate = forward approach command from gate range/size/confidence
 ```
 
+This is still the major weakness in the current stack. A bounded gain-shaping
+experiment was less stable in live Elodin flight, so the next controller
+upgrade should be a real guidance/planning layer with lookahead rather than a
+cosmetic change to the proportional visual-servo law.
+
 The vertical terms now deliberately use two different cues:
 
 - climb/thrust remains conservative and camera/body-relative, so the first gate
@@ -170,15 +175,16 @@ If the gate is not usable, the drone enters search:
 
 ```text
 roll_rate  = 0
-pitch_rate = 0
-settle yaw_rate = 0
-scan yaw_rate   = slow scan rate
+level pitch_rate = pitch-up/down only if attitude is tilted
+brake roll/pitch = oppose body-frame drift if velocity is available
+settle yaw_rate  = 0
+scan yaw_rate    = slow scan rate only after level and settled
 thrust     = hover estimate
 ```
 
 The short settle window is deliberate. It gives the vehicle time to stop adding
-roll/pitch commands and reduce off-axis scan behavior before yawing for
-reacquisition.
+forward approach commands, level the body, and bleed off body-frame drift before
+yawing for reacquisition.
 
 When the gate is close enough for `commit`, lateral and yaw corrections are
 damped. The detector can see only part of the gate frame near passage, so
