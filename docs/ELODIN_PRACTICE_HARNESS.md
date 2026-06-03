@@ -276,6 +276,12 @@ scripts/run_elodin_course_suite.py \
   --camera-profiles vq1_pinhole,gatenet_fisheye
 ```
 
+Latest camera-profile A/B results are summarized in
+`docs/FINAL_PRESENTATION_RESULTS.md`. The short version: `gatenet_fisheye`
+renders successfully and completes `easy`, `low_high`, and
+`four_gate_straight`, but misses the last gate on `lateral_soft` with the
+current classical detector/reactive controller.
+
 Run the hard presentation stress suite with:
 
 ```bash

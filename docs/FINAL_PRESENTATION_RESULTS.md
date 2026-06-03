@@ -34,9 +34,42 @@ Logs:
 ```text
 logs/elodin_course_suite/summary.csv
 logs/elodin_hard_track_results/summary.csv
+logs/elodin_camera_profile_suite/summary.csv
+logs/elodin_camera_profile_four_gate_rerun/summary.csv
 assets/presentation/circular_arc_trace.png
 assets/presentation/s_curve_trace.png
 ```
+
+## Camera Profile A/B
+
+The current harness can compare camera assumptions without replacing the
+autonomy stack:
+
+```text
+ELODIN_CAMERA_PROFILE=vq1_pinhole
+ELODIN_CAMERA_PROFILE=gatenet_fisheye
+```
+
+The `gatenet_fisheye` profile uses a `120 deg` vertical FOV, `144 deg`
+horizontal FOV, and Elodin's `fisheye` render effect. The detector/controller
+use an effective focal length of `103.92 px` for bearing/range approximation.
+
+| Camera Profile | Course | Result | Pass Times | Interpretation |
+|---|---|---:|---|---|
+| `vq1_pinhole` | `easy` | `3/3 COMPLETE` | `4.90, 6.27, 7.48` | default profile still works |
+| `vq1_pinhole` | `lateral_soft` | `3/3 COMPLETE` | `4.89, 6.30, 7.57` | lateral correction still works |
+| `vq1_pinhole` | `low_high` | `3/3 COMPLETE` | `4.86, 6.24, 7.42` | height handling still works |
+| `vq1_pinhole` | `four_gate_straight` | `0/4 DNF` then `4/4 COMPLETE` on immediate rerun | rerun: `4.88, 6.27, 7.50, 8.62` | first row exposed run-to-run sensitivity near gate 0 |
+| `gatenet_fisheye` | `easy` | `3/3 COMPLETE` | `4.94, 6.30, 7.50` | wide/fisheye render path works |
+| `gatenet_fisheye` | `lateral_soft` | `2/3 DNF` | `4.92, 6.30, --` | widened view changes lateral behavior enough to miss gate 2 |
+| `gatenet_fisheye` | `low_high` | `3/3 COMPLETE` | `4.92, 6.29, 7.48` | height-varied straight course still works |
+| `gatenet_fisheye` | `four_gate_straight` | `4/4 COMPLETE` | `4.95, 6.36, 7.59, 8.72` | repeated straight reacquisition works |
+
+Takeaway: the fisheye profile is viable as an experiment, but it does not
+magically fix navigation. With the current classical detector and reactive
+controller, wider FOV helps some reacquisition cases and hurts at least one
+lateral-offset case. The next step is still sequence-aware candidate selection
+and then an actual GateNet/ONNX detector.
 
 ## Takeaway
 
