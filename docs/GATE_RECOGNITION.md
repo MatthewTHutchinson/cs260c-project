@@ -38,7 +38,9 @@ From the May 8 spec:
 
 ## Recognition Strategy
 
-Start with a classical detector and only add learned perception if the real VQ1 frames demand it.
+Start with a classical detector for traceability, then swap in learned
+perception through the same `GateObservation` interface as soon as a compatible
+model is available.
 
 Recommended VQ1 stack:
 
@@ -70,7 +72,30 @@ If gates are not strongly color-coded, add:
 - edge detection
 - rectangular frame template matching
 - Hough-style line grouping
-- lightweight learned classifier for candidate patches
+- learned gate detector for corners, boxes, center/range, or segmentation masks
+
+## Neural Detector Path
+
+Current optional integration:
+
+- `algorithm/neural_gate_detector.py`: OpenCV-DNN/ONNX adapter for neural gate
+  models.
+- `docs/NEURAL_CV_INTEGRATION.md`: model-candidate assessment and validation
+  plan.
+
+The intended learned-CV output is still not a control command. It should produce
+one or more gate observations:
+
+```text
+pixel center
+confidence
+apparent size or distance
+optional ordered inner corners
+```
+
+Those observations then flow through the same temporal tracker and controller.
+This lets us compare classical and neural perception without changing the
+navigation/control experiment.
 
 ## Pose and Range Estimation
 
@@ -160,6 +185,9 @@ Runtime metrics:
 5. Add detector telemetry to evaluation logs.
 6. Tune the detector against Elodin FPV frames without world-pose fallback.
 7. Keep a simple visual overlay tool for debugging candidates.
+8. Try a pretrained or exported neural detector through the ONNX backend.
+9. If no compatible weights are available, fine-tune a corner/segmentation
+   model from Elodin/VQ1 frame labels.
 
 ## Red Lines
 

@@ -15,6 +15,8 @@ FPV frame
 
 This is a completion-first baseline. It does not use GPS, world pose, simulator
 gate IDs, pre-known gate coordinates, depth, RL, MPC, or a learned CV model.
+The codebase now has an optional neural detector adapter, but the results below
+were produced by the classical detector.
 
 ## Local Elodin Validation
 

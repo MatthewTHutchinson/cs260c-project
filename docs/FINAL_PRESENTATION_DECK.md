@@ -61,6 +61,7 @@ Title: `The detector turns a visible gate into bearing, range, and confidence.`
 On-slide:
 
 - HSV segmentation baseline
+- Optional neural detector backend
 - Contour and rectangle extraction
 - Bearing from camera intrinsics
 - Range estimate from apparent gate width
@@ -71,7 +72,7 @@ Visual:
 
 Speaker note:
 
-This detector is intentionally simple. It is not the final answer for every environment, but it is transparent. If the gate is off-center, we can see the measured bearing and directly understand the yaw command.
+This detector is intentionally simple. It is not the final answer for every environment, but it is transparent. The detector boundary now also accepts neural corner, box, center/range, or segmentation outputs, which means the learned-CV upgrade does not require rewriting the tracker and controller.
 
 ## Slide 4: Temporal Tracking
 
@@ -229,7 +230,7 @@ On-slide:
 
 1. Add gate-sequence memory for multiple gates in view.
 2. Add future-gate lookahead for curved tracks.
-3. Improve CV beyond color/contour heuristics.
+3. Test a pretrained or fine-tuned neural gate detector.
 4. Implement the MAVSDK attitude-rate adapter.
 5. Use reactive-run logs as data for a compact learned policy.
 
@@ -241,4 +242,4 @@ Reactive baseline -> logged attempts -> compact learned policy
 
 Speaker note:
 
-The learning path is still there, but it comes after the observable baseline works. The immediate project is a robust autonomous racing algorithm, not another opaque training run.
+The learning path is now modular. First replace the detector if it improves gate candidates; then add sequence-aware candidate selection and lookahead; then consider replacing the reactive controller with MPC or a compact learned policy.

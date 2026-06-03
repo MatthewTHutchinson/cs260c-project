@@ -32,6 +32,8 @@ class GateObservation:
     distance_est: float   # estimated distance (metres)
     confidence: float     # [0, 1]
     pixel_centre: tuple   # (cx, cy) in image coords
+    corners_px: Optional[tuple[tuple[float, float], ...]] = None
+    source: str = "classical"
 
 
 @dataclass

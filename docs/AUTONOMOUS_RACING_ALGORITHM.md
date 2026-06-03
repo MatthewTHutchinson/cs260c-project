@@ -64,7 +64,7 @@ At each control step:
 ```text
 Simulator / VQ1 runtime
   -> FPV frame logger + telemetry adapter
-  -> GateDetector
+  -> GateDetector or neural detector backend
   -> GateTracker
   -> ReactiveGateController
   -> RacingCommand
@@ -84,9 +84,9 @@ Boundaries:
 - attitude/orientation is allowed telemetry and is used only to interpret
   body/camera vertical geometry, not to infer global position.
 
-The current implementation is intentionally classical and inspectable. The
-learning path remains a future extension after VQ1 frames and simulator behavior
-are known.
+The current validated detector is classical and inspectable. A neural detector
+backend now exists as an optional module so learned perception can be tested
+without changing the tracker, controller, or command boundary.
 
 ## Gate Recognition
 
@@ -103,6 +103,8 @@ Current CV implementation:
 - `algorithm/gate_detector.py`: HSV masks for the observed Elodin gate colors
   plus the original orange/yellow demo color, contour extraction, candidate
   scoring, bearing, and rough range.
+- `algorithm/neural_gate_detector.py`: optional OpenCV-DNN/ONNX backend for
+  learned gate models that output corners, boxes, center/range, or heatmaps.
 - `algorithm/gate_tracker.py`: confidence filtering, short memory for dropped
   frames, and `detected` / `tracked` / `commit` / `search` mode assignment.
 - `scripts/inspect_gate_frames.py`: offline frame inspection, overlays, masks,
@@ -122,6 +124,7 @@ mode
 ```
 
 The current implementation begins in `algorithm/gate_tracker.py` and wraps `algorithm/gate_detector.py`.
+The learned-CV integration plan is in `docs/NEURAL_CV_INTEGRATION.md`.
 
 ## Temporal Tracking
 

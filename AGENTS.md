@@ -21,7 +21,7 @@ as the main final-project claim.
 ```text
 Simulator or VQ1 runtime
   -> FPV frame logger + telemetry adapter
-  -> GateDetector
+  -> GateDetector or neural detector backend
   -> GateTracker
   -> ReactiveGateController
   -> RacingCommand
@@ -60,10 +60,13 @@ attitude-rate/thrust commands.
 
 ## Computer Vision
 
-Current CV is deliberately classical and inspectable:
+Current validated CV is deliberately classical and inspectable, with an
+optional learned-detector backend for the next perception upgrade:
 
 - `algorithm/gate_detector.py`: OpenCV HSV masks, contour extraction, candidate
   scoring, image bearing, and approximate range.
+- `algorithm/neural_gate_detector.py`: optional OpenCV-DNN/ONNX adapter for
+  learned detector outputs such as corners, boxes, center/range, or heatmaps.
 - `algorithm/gate_tracker.py`: confidence filtering, short-memory tracking,
   and `search` / `detected` / `tracked` / `commit` mode assignment.
 - `scripts/inspect_gate_frames.py`: offline overlays, masks, and trace output.

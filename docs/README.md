@@ -17,6 +17,7 @@ Old PyBullet training and track-development material is quarantined under
 - `COMPETITION_CONTEXT.md`: current source hierarchy, April 10 notes, May 8 spec anchors, and open competition questions.
 - `VQ1_ACCESS_RUNBOOK.md`: Windows access options and first-day simulator setup plan.
 - `GATE_RECOGNITION.md`: FPV gate detection, tracking, pose estimation, and recognition metrics.
+- `NEURAL_CV_INTEGRATION.md`: learned gate detector options, ONNX backend hook, and validation plan.
 - `DRONE_CONTROL.md`: command architecture, MAVLink mapping options, and safe VQ1 control strategy.
 - `PATH_PLANNING_NAVIGATION.md`: gate-order navigation, local guidance, search behavior, and VQ1/VQ2 planning split.
 

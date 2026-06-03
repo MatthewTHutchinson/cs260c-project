@@ -1,14 +1,26 @@
-"""Temporal gate tracker built around the current classical detector."""
+"""Temporal gate tracker built around interchangeable gate detectors."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Protocol
 
 import numpy as np
 
 from algorithm.gate_detector import CameraParams, GateDetector, GateObservation
 from algorithm.types import GateEstimate, TrackMode
+
+
+class GateDetectorBackend(Protocol):
+    gate_w: float
+
+    def detect(
+        self,
+        bgr_frame: np.ndarray,
+        cam: CameraParams,
+        max_gates: int = 2,
+    ) -> list[GateObservation]:
+        ...
 
 
 @dataclass
@@ -26,7 +38,7 @@ class GateTracker:
 
     def __init__(
         self,
-        detector: Optional[GateDetector] = None,
+        detector: Optional[GateDetectorBackend] = None,
         camera_params: Optional[CameraParams] = None,
         config: Optional[GateTrackerConfig] = None,
     ) -> None:
