@@ -93,8 +93,82 @@ index 28782ce..0548059 100644
 +def collect_frame(ctx: el.StepContext, name: str, timestamp: int | None = None) -> np.ndarray | None:
 +    """Read the latest rendered frame from the message log without rendering."""
 +    return _frame_array(ctx.read_msg(name, timestamp=timestamp))
+diff --git a/sim/course.py b/sim/course.py
+index 4a5df72..64e3d7c 100644
+--- a/sim/course.py
++++ b/sim/course.py
+@@ -50,14 +50,50 @@ class Gate:
+     yaw_deg: float = 0.0
+
+
+-# 3 AGP-style vertical gates straight ahead at hover altitude. Elodin uses
+-# ENU world coordinates, so +X is East and +Z is Up.
++# AGP-style vertical gates. Elodin uses ENU world coordinates, so +X is East
++# and +Z is Up. These courses are validation surfaces only; the solver must not
++# receive gate positions or course names.
+ EASY_COURSE: Tuple[Gate, ...] = (
+     Gate(0, (10.0, 0.0, 1.8)),
+     Gate(1, (20.0, 0.0, 1.8)),
+     Gate(2, (30.0, 0.0, 1.8)),
+ )
+
++LATERAL_SOFT_COURSE: Tuple[Gate, ...] = (
++    Gate(0, (10.0, 0.0, 1.8)),
++    Gate(1, (20.0, 0.35, 1.8)),
++    Gate(2, (30.0, -0.15, 1.8)),
++)
++
++LOW_HIGH_COURSE: Tuple[Gate, ...] = (
++    Gate(0, (10.0, 0.0, 1.8)),
++    Gate(1, (20.0, 0.0, 1.6)),
++    Gate(2, (30.0, 0.0, 1.9)),
++)
++
++FOUR_GATE_STRAIGHT_COURSE: Tuple[Gate, ...] = (
++    Gate(0, (10.0, 0.0, 1.8)),
++    Gate(1, (20.0, 0.0, 1.8)),
++    Gate(2, (30.0, 0.0, 1.8)),
++    Gate(3, (40.0, 0.0, 1.8)),
++)
++
++COURSES: dict[str, Tuple[Gate, ...]] = {
++    "easy": EASY_COURSE,
++    "lateral_soft": LATERAL_SOFT_COURSE,
++    "low_high": LOW_HIGH_COURSE,
++    "four_gate_straight": FOUR_GATE_STRAIGHT_COURSE,
++}
++
++
++def course_by_name(name: str) -> Tuple[Gate, ...]:
++    key = name.strip().lower()
++    if key not in COURSES:
++        choices = ", ".join(sorted(COURSES))
++        raise ValueError(f"unknown course {name!r}; expected one of: {choices}")
++    return COURSES[key]
++
++
+ # Index of the LAST gate the drone has crossed; -1 before any pass.
+ # external_control so the post_step gate-tracker can write to it.
+ LastGatePassed = ty.Annotated[
+@@ -198,6 +234,7 @@ def detect_gate_pass(
+
+
+ def print_summary(
++    course_name: str,
+     course: Tuple[Gate, ...],
+     last_gate_passed: int,
+     pass_times: list,
+@@ -217,7 +254,7 @@ def print_summary(
+         f"{pass_times[i]:.2f}" if i < n_passed else "--" for i in range(n)
+     )
+     line = (
+-        f"[RACE] course=easy gates_passed={n_passed}/{n} "
++        f"[RACE] course={course_name} gates_passed={n_passed}/{n} "
+         f"lap_time={lap_time:.2f}s status={status} pass_times=[{laps_str}]"
+     )
+     print(line)
 diff --git a/sim/main.py b/sim/main.py
-index f60ddd1..3f12bfe 100644
+index f60ddd1..27588cc 100644
 --- a/sim/main.py
 +++ b/sim/main.py
 @@ -15,6 +15,7 @@ Prerequisites:
@@ -139,7 +213,7 @@ index f60ddd1..3f12bfe 100644
  REPO_ROOT = _REPO_ROOT
  BETAFLIGHT_PATH = REPO_ROOT / "betaflight" / "obj" / "main" / "betaflight_SITL.elf"
 
-@@ -78,7 +103,55 @@ def cleanup_stale_betaflight():
+@@ -78,14 +103,65 @@ def cleanup_stale_betaflight():
          pass
 
 
@@ -196,7 +270,19 @@ index f60ddd1..3f12bfe 100644
      cleanup_stale_betaflight()
 
 
-@@ -180,20 +253,26 @@ visualization = create_visualization_system(config)
+ world = el.World()
+
+-# Active race course: straight ahead along ENU +X at hover altitude.
+-ACTIVE_COURSE = race_course.EASY_COURSE
++# Active race course. This only affects simulator spawning/scoring; the solver
++# still receives FPV frames and telemetry, not gate positions or course names.
++COURSE_NAME = os.environ.get("ELODIN_COURSE", "easy").strip().lower()
++ACTIVE_COURSE = race_course.course_by_name(COURSE_NAME)
++print(f"[CFG] Race course: {COURSE_NAME} ({len(ACTIVE_COURSE)} gates)")
+
+ drone = world.spawn(
+     [
+@@ -180,20 +256,26 @@ visualization = create_visualization_system(config)
  system = physics | sensors | visualization
 
 
@@ -231,7 +317,7 @@ index f60ddd1..3f12bfe 100644
 
 
  @dataclass
-@@ -254,6 +333,8 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
+@@ -254,6 +336,8 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
 
      # Lazy initialization - only start bridge when first tick runs
      if bridge[0] is None or not getattr(bridge[0], "_started", False):
@@ -240,7 +326,7 @@ index f60ddd1..3f12bfe 100644
          print("[SITL] Initializing bridge...")
          pending_bridge = BetaflightSyncBridge(timeout_ms=100)
          sensor_buf[0] = SensorDataBuffer()
-@@ -365,33 +446,32 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
+@@ -365,33 +449,32 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
      except TimeoutError:
          pass
 
@@ -295,7 +381,7 @@ index f60ddd1..3f12bfe 100644
 
      next_gate_index = (
          _race_last_gate[0] + 1
-@@ -489,6 +569,7 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
+@@ -489,6 +572,7 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
      if tick >= MAX_TICKS - 1:
          _completed[0] = True
          b.stop()
@@ -303,7 +389,15 @@ index f60ddd1..3f12bfe 100644
          elapsed = time.time() - start_time[0]
 
          # Read final position
-@@ -559,16 +640,21 @@ def next_filename(pattern: str) -> str:
+@@ -529,6 +613,7 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
+             print("WARNING: No motor response. Check Betaflight configuration.")
+
+         race_course.print_summary(
++            COURSE_NAME,
+             ACTIVE_COURSE,
+             _race_last_gate[0],
+             _race_pass_times,
+@@ -559,16 +644,21 @@ def next_filename(pattern: str) -> str:
 
  db_filename = next_filename("betaflight_dbXXX")
  print(f"Writing database to: {db_filename}")

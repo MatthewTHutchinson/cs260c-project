@@ -232,6 +232,31 @@ scripts/plot_pilot_trace.py \
   --out logs/elodin_editor_trace.png
 ```
 
+Run a selected simulator course with:
+
+```bash
+ELODIN_COURSE=easy ELODIN_SIM_TIME=12 scripts/run_elodin_editor.sh
+```
+
+Available local validation courses in the sibling harness patch:
+
+- `easy`: three straight gates; current champion completes this course
+- `lateral_soft`: small lateral offsets after gate 0
+- `low_high`: modest gate-height variation after gate 0
+- `four_gate_straight`: longer straight-line completion check
+
+Run a suite with:
+
+```bash
+scripts/run_elodin_course_suite.py --courses easy,lateral_soft,low_high,four_gate_straight
+```
+
+The suite writes per-course traces/logs/frames under:
+
+```text
+logs/elodin_course_suite/
+```
+
 Validation rule:
 
 - If `elodin_pilot_trace_editor.csv` is all `search`, `frame_fresh` is always

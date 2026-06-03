@@ -59,6 +59,35 @@ At each control step:
 8. Send command through the backend adapter.
 9. Log raw frame, detection, telemetry, command, and simulator status.
 
+## Current System Architecture
+
+```text
+Simulator / VQ1 runtime
+  -> FPV frame logger + telemetry adapter
+  -> GateDetector
+  -> GateTracker
+  -> ReactiveGateController
+  -> RacingCommand
+  -> backend adapter
+      -> Elodin Betaflight RC today
+      -> MAVSDK attitude-rate/thrust for VQ1
+```
+
+Boundaries:
+
+- `algorithm/` is the competition-facing autonomy package.
+- `solver/cs260c_pilot.py` in the sibling Elodin harness is only an adapter.
+- `patches/elodin-ai-grand-prix-cs260c.patch` records the sibling harness
+  changes needed to reproduce local validation.
+- world position and simulator gate IDs are never passed into
+  `AutonomousRacingPilot`.
+- attitude/orientation is allowed telemetry and is used only to interpret
+  body/camera vertical geometry, not to infer global position.
+
+The current implementation is intentionally classical and inspectable. The
+learning path remains a future extension after VQ1 frames and simulator behavior
+are known.
+
 ## Gate Recognition
 
 The first detector is deliberately classical:
@@ -68,6 +97,16 @@ The first detector is deliberately classical:
 - rectangle/quadrilateral scoring
 - bearing from camera intrinsics
 - approximate range from apparent gate width
+
+Current CV implementation:
+
+- `algorithm/gate_detector.py`: HSV masks for the observed Elodin gate colors
+  plus the original orange/yellow demo color, contour extraction, candidate
+  scoring, bearing, and rough range.
+- `algorithm/gate_tracker.py`: confidence filtering, short memory for dropped
+  frames, and `detected` / `tracked` / `commit` / `search` mode assignment.
+- `scripts/inspect_gate_frames.py`: offline frame inspection, overlays, masks,
+  and trace generation for detector debugging.
 
 The output is:
 
