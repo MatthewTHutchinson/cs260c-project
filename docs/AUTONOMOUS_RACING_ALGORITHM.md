@@ -132,7 +132,8 @@ Tracking states:
 - `detected`: current frame has a usable gate candidate.
 - `tracked`: no current detection, but a recent estimate is still fresh enough.
 - `search`: no reliable gate estimate.
-- `commit`: the visible gate is close enough that the controller should keep passing through instead of dithering.
+- `commit`: the visible gate is close enough that the controller should keep
+  passing through instead of chasing clipped edge/corner detections.
 - `recover`: reserved for future safety handling after excessive attitude, collision flags, or sustained detection loss.
 
 No competition-facing mode may fall back to simulator track truth.
@@ -161,9 +162,19 @@ If the gate is not usable, the drone enters search:
 ```text
 roll_rate  = 0
 pitch_rate = 0
-yaw_rate   = slow scan rate
+settle yaw_rate = 0
+scan yaw_rate   = slow scan rate
 thrust     = hover estimate
 ```
+
+The short settle window is deliberate. It gives the vehicle time to stop adding
+roll/pitch commands and reduce off-axis scan behavior before yawing for
+reacquisition.
+
+When the gate is close enough for `commit`, lateral and yaw corrections are
+damped. The detector can see only part of the gate frame near passage, so
+aggressive centering at that point risks steering toward a visible edge instead
+of the gate opening.
 
 All commands are clipped before leaving the algorithm.
 

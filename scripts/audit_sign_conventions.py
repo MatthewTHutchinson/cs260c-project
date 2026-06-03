@@ -153,6 +153,15 @@ def main() -> int:
     below_optical_cmd = controller.compute(below_optical_gate, VehicleTelemetry())
     right_cmd = controller.compute(right_gate, VehicleTelemetry())
     right_rc = to_betaflight_rc_fields(right_cmd)
+    search_gate = GateEstimate(mode=TrackMode.SEARCH)
+    search_settle_cmd = controller.compute(
+        search_gate,
+        VehicleTelemetry(timestamp_s=1.0),
+    )
+    search_scan_cmd = controller.compute(
+        search_gate,
+        VehicleTelemetry(timestamp_s=1.0 + controller.gains.search_settle_s + 0.1),
+    )
 
     observed = first_non_search(args.trace)
 
@@ -203,6 +212,14 @@ def main() -> int:
         f"roll={right_cmd.roll_rate_rad_s:.3f} yaw={right_cmd.yaw_rate_rad_s:.3f} "
         f"rc_roll={right_rc['roll']} rc_yaw={right_rc['yaw']}"
     )
+    print(
+        "search_command="
+        f"settle_yaw={search_settle_cmd.yaw_rate_rad_s:.3f} "
+        f"scan_yaw={search_scan_cmd.yaw_rate_rad_s:.3f} "
+        f"roll={search_scan_cmd.roll_rate_rad_s:.3f} "
+        f"pitch={search_scan_cmd.pitch_rate_rad_s:.3f} "
+        f"thrust={search_scan_cmd.thrust_norm:.3f}"
+    )
 
     failures = []
     if "CAM_TILT_UP_DEG" not in elodin_pitch_offset(args.elodin_camera):
@@ -225,6 +242,15 @@ def main() -> int:
         failures.append("right-of-center gate should command positive internal yaw and RC yaw above center")
     if right_cmd.roll_rate_rad_s <= 0.0 or right_rc["roll"] <= 1500:
         failures.append("right-of-center gate should command positive internal roll and RC roll above center")
+    if abs(search_settle_cmd.yaw_rate_rad_s) > 1e-9:
+        failures.append("search should settle at hover before starting yaw scan")
+    if search_scan_cmd.yaw_rate_rad_s <= 0.0:
+        failures.append("search should start a yaw scan after the settle window")
+    if (
+        abs(search_scan_cmd.roll_rate_rad_s) > 1e-9
+        or abs(search_scan_cmd.pitch_rate_rad_s) > 1e-9
+    ):
+        failures.append("search scan should not command roll or pitch")
 
     if failures:
         print("verdict=FAIL")

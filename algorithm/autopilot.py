@@ -35,6 +35,7 @@ class AutonomousRacingPilot:
 
     def reset(self) -> None:
         self.tracker.reset()
+        self.controller.reset()
 
     def update(
         self,

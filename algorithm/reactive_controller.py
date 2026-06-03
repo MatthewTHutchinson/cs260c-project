@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+import time
 
 import numpy as np
 
@@ -23,6 +24,7 @@ class ReactiveControllerGains:
     hover_thrust: float = 0.52
     min_thrust: float = 0.30
     max_thrust: float = 0.95
+    search_settle_s: float = 0.75
     search_yaw_rate_rad_s: float = 0.45
     max_roll_rate_rad_s: float = 0.70
     max_pitch_rate_rad_s: float = 0.80
@@ -33,6 +35,9 @@ class ReactiveControllerGains:
     vertical_forward_deadband_rad: float = 0.02
     vertical_forward_suppression_rad: float = 0.16
     camera_tilt_up_rad: float = math.radians(20.0)
+    commit_lateral_scale: float = 0.25
+    commit_yaw_scale: float = 0.25
+    commit_forward_scale: float = 1.15
 
 
 class ReactiveGateController:
@@ -40,6 +45,10 @@ class ReactiveGateController:
 
     def __init__(self, gains: ReactiveControllerGains | None = None) -> None:
         self.gains = gains or ReactiveControllerGains()
+        self._search_started_s: float | None = None
+
+    def reset(self) -> None:
+        self._search_started_s = None
 
     def compute(
         self,
@@ -49,8 +58,17 @@ class ReactiveGateController:
         telemetry = telemetry or VehicleTelemetry()
 
         if not gate.is_usable or gate.confidence < self.gains.minimum_track_confidence:
+            now_s = self._timestamp_s(telemetry)
+            if self._search_started_s is None:
+                self._search_started_s = now_s
+            search_elapsed_s = max(0.0, now_s - self._search_started_s)
+            yaw_rate = (
+                0.0
+                if search_elapsed_s < self.gains.search_settle_s
+                else self.gains.search_yaw_rate_rad_s
+            )
             return RacingCommand(
-                yaw_rate_rad_s=self.gains.search_yaw_rate_rad_s,
+                yaw_rate_rad_s=yaw_rate,
                 thrust_norm=self.gains.hover_thrust,
                 mode=TrackMode.SEARCH,
             ).clipped(
@@ -60,6 +78,8 @@ class ReactiveGateController:
                 self.gains.min_thrust,
                 self.gains.max_thrust,
             )
+
+        self._search_started_s = None
 
         confidence_scale = float(np.clip(gate.confidence, 0.15, 1.0))
         centered_scale = float(np.clip(1.0 - abs(gate.bearing_h_rad) / 0.9, 0.25, 1.0))
@@ -72,8 +92,12 @@ class ReactiveGateController:
         pitch_rate = self._forward_pitch_rate(gate, telemetry, confidence_scale, centered_scale)
 
         if gate.mode == TrackMode.COMMIT:
-            pitch_rate *= 1.15
-            yaw_rate *= 0.75
+            # Close, partially clipped gate contours can pull the apparent
+            # target toward an edge. Commit mostly preserves pass-through
+            # motion instead of chasing a corner-shaped visual residual.
+            pitch_rate *= self.gains.commit_forward_scale
+            roll_rate *= self.gains.commit_lateral_scale
+            yaw_rate *= self.gains.commit_yaw_scale
 
         return RacingCommand(
             roll_rate_rad_s=roll_rate,
@@ -158,3 +182,9 @@ class ReactiveGateController:
                 + body_forward_elevation_from_quat_xyzw(telemetry.attitude_quat)
             )
         return body_elevation
+
+    @staticmethod
+    def _timestamp_s(telemetry: VehicleTelemetry) -> float:
+        if telemetry.timestamp_s > 0.0:
+            return float(telemetry.timestamp_s)
+        return time.monotonic()

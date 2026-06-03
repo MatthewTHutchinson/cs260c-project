@@ -85,10 +85,11 @@ Current navigation is a visual-servo controller, not a learned policy:
 
 Control modes:
 
-- `search`: slow yaw scan with hover thrust.
+- `search`: hover/settle first, then slow yaw scan with no roll or pitch command.
 - `detected`: current-frame gate target.
 - `tracked`: short-memory target during brief detector drops.
-- `commit`: continue through a near gate instead of dithering.
+- `commit`: continue through a near gate with damped lateral/yaw correction
+  instead of chasing clipped edge/corner detections.
 - `recover`: reserved for future safety behavior.
 
 Keep sign/frame checks centralized. Camera pitch, body attitude, ENU/NED, and
