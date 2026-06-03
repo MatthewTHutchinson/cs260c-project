@@ -79,7 +79,9 @@ If gates are not strongly color-coded, add:
 Current optional integration:
 
 - `algorithm/neural_gate_detector.py`: OpenCV-DNN/ONNX adapter for neural gate
-  models.
+  models, including `GateNetONNXDetector`.
+- `algorithm/detector_factory.py`: runtime detector selection for
+  `classical`, `onnx`, and `gatenet`.
 - `docs/NEURAL_CV_INTEGRATION.md`: model-candidate assessment and validation
   plan.
 
@@ -96,6 +98,25 @@ optional ordered inner corners
 Those observations then flow through the same temporal tracker and controller.
 This lets us compare classical and neural perception without changing the
 navigation/control experiment.
+
+Example offline GateNet/ONNX inspection:
+
+```bash
+CS260C_GATE_DETECTOR=gatenet \
+CS260C_GATE_DETECTOR_MODEL=models/gatenet.onnx \
+CS260C_GATE_DETECTOR_OUTPUT=corners8 \
+scripts/inspect_gate_frames.py \
+  --source logs/elodin_fpv_frames \
+  --out-dir logs/gatenet_inspection_elodin
+```
+
+If the export reports pixel coordinates in the resized detector input instead
+of normalized coordinates, add:
+
+```bash
+CS260C_GATE_DETECTOR_NORMALIZED=0
+CS260C_GATE_DETECTOR_PIXEL_SPACE=input
+```
 
 ## Pose and Range Estimation
 

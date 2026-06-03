@@ -86,7 +86,9 @@ Boundaries:
 
 The current validated detector is classical and inspectable. A neural detector
 backend now exists as an optional module so learned perception can be tested
-without changing the tracker, controller, or command boundary.
+without changing the tracker, controller, or command boundary. GateNet-style
+models are selected through the same runtime detector factory once exported to
+ONNX.
 
 ## Gate Recognition
 
@@ -104,11 +106,15 @@ Current CV implementation:
   plus the original orange/yellow demo color, contour extraction, candidate
   scoring, bearing, and rough range.
 - `algorithm/neural_gate_detector.py`: optional OpenCV-DNN/ONNX backend for
-  learned gate models that output corners, boxes, center/range, or heatmaps.
+  learned gate models that output corners, boxes, center/range, or heatmaps;
+  includes a named `GateNetONNXDetector` wrapper.
+- `algorithm/detector_factory.py`: detector selection from code, CLI tools,
+  or environment variables such as `CS260C_GATE_DETECTOR=gatenet`.
 - `algorithm/gate_tracker.py`: confidence filtering, short memory for dropped
   frames, and `detected` / `tracked` / `commit` / `search` mode assignment.
 - `scripts/inspect_gate_frames.py`: offline frame inspection, overlays, masks,
-  and trace generation for detector debugging.
+  and trace generation for detector debugging with either classical or neural
+  detector backends.
 
 The output is:
 

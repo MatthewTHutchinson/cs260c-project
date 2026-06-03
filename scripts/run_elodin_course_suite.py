@@ -66,6 +66,7 @@ def parse_race_summary(log_path: Path) -> dict[str, str]:
 
 def run_course(
     *,
+    camera_profile: str,
     course: str,
     out_root: Path,
     sim_time: float,
@@ -73,7 +74,7 @@ def run_course(
     idle_timeout_s: float,
     frame_stride: int,
 ) -> dict[str, str]:
-    run_dir = (out_root / course).resolve()
+    run_dir = (out_root / camera_profile / course).resolve()
     trace_path = run_dir / "trace.csv"
     frame_dir = run_dir / "frames"
     log_path = run_dir / "editor.log"
@@ -87,6 +88,7 @@ def run_course(
     env.update(
         {
             "ELODIN_COURSE": course,
+            "ELODIN_CAMERA_PROFILE": camera_profile,
             "ELODIN_SIM_TIME": f"{sim_time:g}",
             "TRACE_PATH": str(trace_path),
             "FRAME_DIR": str(frame_dir),
@@ -120,7 +122,7 @@ def run_course(
                     f.seek(log_pos)
                     for line in f:
                         last_log_update = time.monotonic()
-                        print(f"[{course}] {line}", end="", flush=True)
+                        print(f"[{camera_profile}/{course}] {line}", end="", flush=True)
                         if "[RACE]" in line:
                             saw_race_summary = True
                     log_pos = f.tell()
@@ -154,6 +156,7 @@ def run_course(
 
     elapsed_s = time.monotonic() - start
     result = {
+        "camera_profile": camera_profile,
         "course": course,
         "elapsed_wall_s": f"{elapsed_s:.1f}",
         "timed_out": str(timed_out),
@@ -174,6 +177,11 @@ def main() -> int:
         help="Comma-separated ELODIN_COURSE names.",
     )
     parser.add_argument("--out-dir", type=Path, default=Path("logs/elodin_course_suite"))
+    parser.add_argument(
+        "--camera-profiles",
+        default=os.environ.get("ELODIN_CAMERA_PROFILE", "vq1_pinhole"),
+        help="Comma-separated camera profiles, e.g. vq1_pinhole,gatenet_fisheye.",
+    )
     parser.add_argument("--sim-time", type=float, default=12.0)
     parser.add_argument("--timeout-s", type=float, default=180.0)
     parser.add_argument("--idle-timeout-s", type=float, default=45.0)
@@ -183,24 +191,34 @@ def main() -> int:
     courses = [course.strip() for course in args.courses.split(",") if course.strip()]
     if not courses:
         raise ValueError("at least one course is required")
+    camera_profiles = [
+        profile.strip()
+        for profile in args.camera_profiles.split(",")
+        if profile.strip()
+    ]
+    if not camera_profiles:
+        raise ValueError("at least one camera profile is required")
 
     args.out_dir = args.out_dir.resolve()
     args.out_dir.mkdir(parents=True, exist_ok=True)
     rows = []
-    for course in courses:
-        rows.append(
-            run_course(
-                course=course,
-                out_root=args.out_dir,
-                sim_time=args.sim_time,
-                timeout_s=args.timeout_s,
-                idle_timeout_s=args.idle_timeout_s,
-                frame_stride=max(1, args.frame_stride),
+    for camera_profile in camera_profiles:
+        for course in courses:
+            rows.append(
+                run_course(
+                    camera_profile=camera_profile,
+                    course=course,
+                    out_root=args.out_dir,
+                    sim_time=args.sim_time,
+                    timeout_s=args.timeout_s,
+                    idle_timeout_s=args.idle_timeout_s,
+                    frame_stride=max(1, args.frame_stride),
+                )
             )
-        )
 
     summary_path = args.out_dir / "summary.csv"
     fieldnames = [
+        "camera_profile",
         "course",
         "completed",
         "status",
@@ -227,7 +245,11 @@ def main() -> int:
         passed = row.get("passed", "?")
         total = row.get("total", "?")
         lap = row.get("lap_time", "?")
-        print(f"{row['course']}: {status} gates={passed}/{total} lap_time={lap}", flush=True)
+        print(
+            f"{row['camera_profile']}/{row['course']}: "
+            f"{status} gates={passed}/{total} lap_time={lap}",
+            flush=True,
+        )
 
     failures = [row for row in rows if row.get("status") != "COMPLETE"]
     return 1 if failures else 0

@@ -80,6 +80,20 @@ scripts/plot_pilot_trace.py \
 scripts/inspect_gate_frames.py --source path/to/frames_or_video --out-dir logs/gate_inspection_real
 ```
 
+Swap in a GateNet-style ONNX export for detector-only validation:
+
+```bash
+CS260C_GATE_DETECTOR=gatenet \
+CS260C_GATE_DETECTOR_MODEL=models/gatenet.onnx \
+CS260C_GATE_DETECTOR_OUTPUT=corners8 \
+scripts/inspect_gate_frames.py \
+  --source logs/elodin_fpv_frames \
+  --out-dir logs/gatenet_inspection_elodin
+```
+
+The repo does not include GateNet weights. Treat this as an adapter path until
+an exported model is available and its overlays beat the classical baseline.
+
 If direct script commands pick the wrong Python, use:
 
 ```bash

@@ -57,6 +57,7 @@ echo "[CS260C] editor stdout log: $LOG_PATH"
 echo "[CS260C] pilot trace: $TRACE_PATH"
 echo "[CS260C] FPV frame dir: $FRAME_DIR"
 echo "[CS260C] Elodin course: ${ELODIN_COURSE:-easy}"
+echo "[CS260C] Camera profile: ${ELODIN_CAMERA_PROFILE:-vq1_pinhole}"
 echo "[CS260C] clear old editor logs: $CLEAR_EDITOR_LOGS"
 echo "[CS260C] cleanup stale processes: $CLEANUP_STALE_PROCESSES"
 echo "[CS260C] Elodin CLI: $(elodin --version 2>/dev/null || echo unknown)"
@@ -74,4 +75,5 @@ ELODIN_ENABLE_FPV="${ELODIN_ENABLE_FPV:-1}" \
 ELODIN_REAL_TIME="${ELODIN_REAL_TIME:-1}" \
 ELODIN_INTERACTIVE="${ELODIN_INTERACTIVE:-1}" \
 ELODIN_COURSE="${ELODIN_COURSE:-easy}" \
+ELODIN_CAMERA_PROFILE="${ELODIN_CAMERA_PROFILE:-vq1_pinhole}" \
   elodin editor sim/main.py

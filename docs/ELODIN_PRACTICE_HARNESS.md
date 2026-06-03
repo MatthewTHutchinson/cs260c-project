@@ -232,6 +232,21 @@ scripts/plot_pilot_trace.py \
   --out logs/elodin_editor_trace.png
 ```
 
+Run the same saved-frame inspection with a GateNet-style ONNX export:
+
+```bash
+CS260C_GATE_DETECTOR=gatenet \
+CS260C_GATE_DETECTOR_MODEL=models/gatenet.onnx \
+CS260C_GATE_DETECTOR_OUTPUT=corners8 \
+scripts/inspect_gate_frames.py \
+  --source logs/elodin_fpv_frames \
+  --out-dir logs/gatenet_inspection_elodin
+```
+
+Use this offline step before live flight. The current course-completion results
+still use the classical HSV detector because no GateNet weights/export are
+checked into this repo.
+
 Run a selected simulator course with:
 
 ```bash
@@ -251,6 +266,14 @@ Run a suite with:
 
 ```bash
 scripts/run_elodin_course_suite.py --courses easy,lateral_soft,low_high,four_gate_straight
+```
+
+Compare camera assumptions across the suite:
+
+```bash
+scripts/run_elodin_course_suite.py \
+  --courses easy,lateral_soft,low_high,four_gate_straight \
+  --camera-profiles vq1_pinhole,gatenet_fisheye
 ```
 
 Run the hard presentation stress suite with:

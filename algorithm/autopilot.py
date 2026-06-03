@@ -7,6 +7,7 @@ from typing import Optional
 
 import numpy as np
 
+from algorithm.detector_factory import build_gate_tracker
 from algorithm.gate_tracker import GateTracker
 from algorithm.reactive_controller import ReactiveGateController
 from algorithm.types import GateEstimate, RacingCommand, VehicleTelemetry
@@ -29,7 +30,7 @@ class AutonomousRacingPilot:
         controller: Optional[ReactiveGateController] = None,
         frame_format: str = "bgr",
     ) -> None:
-        self.tracker = tracker or GateTracker()
+        self.tracker = tracker or build_gate_tracker()
         self.controller = controller or ReactiveGateController()
         self.frame_format = frame_format
 

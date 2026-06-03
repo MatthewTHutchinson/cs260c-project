@@ -14,7 +14,11 @@ Why it exists:
 
 - the Elodin checkout's Git remote points to upstream `elodin-sys/ai-grand-prix`
 - the CS260C course repo still needs a reproducible record of local harness changes
-- the patch includes the inline Betaflight smoke-test support and `solver/cs260c_pilot.py`
+- the patch includes the inline Betaflight smoke-test support, FPV camera
+  profile experiments, custom courses, and `solver/cs260c_pilot.py`
+- `solver/cs260c_pilot.py` selects the active detector through the CS260C
+  algorithm package, so `CS260C_GATE_DETECTOR=gatenet` can be tested without
+  editing the sibling solver
 
 Apply from the Elodin repo root with:
 

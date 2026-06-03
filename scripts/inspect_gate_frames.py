@@ -40,7 +40,12 @@ if str(REPO_ROOT) not in sys.path:
 
 from algorithm import AutonomousRacingPilot, VehicleTelemetry
 from algorithm.control_adapter import to_betaflight_rc_fields
-from algorithm.gate_detector import CameraParams, GateDetector
+from algorithm.camera_profiles import get_camera_profile
+from algorithm.detector_factory import (
+    build_gate_detector,
+    detector_config_from_env,
+    parse_input_size,
+)
 from algorithm.gate_tracker import GateTracker
 from algorithm.types import GateEstimate, RacingCommand, TrackMode
 
@@ -324,9 +329,12 @@ def write_row(
 def write_mask(
     frame: np.ndarray,
     out_path: Path,
-    detector: GateDetector,
+    detector: object,
 ) -> None:
-    mask = detector.mask(frame)
+    mask_fn = getattr(detector, "mask", None)
+    if not callable(mask_fn):
+        raise TypeError("detector backend does not expose a mask() debug method")
+    mask = mask_fn(frame)
     cv2.imwrite(str(out_path), mask)
 
 
@@ -336,6 +344,54 @@ def main() -> int:
     parser.add_argument("--demo", action="store_true", help="Run on a synthetic gate frame.")
     parser.add_argument("--demo-frames", type=int, default=1, help="Synthetic demo length.")
     parser.add_argument("--out-dir", type=Path, default=Path("logs/gate_inspection"))
+    parser.add_argument(
+        "--detector",
+        choices=("classical", "onnx", "gatenet"),
+        default=None,
+        help=(
+            "Detector backend. Defaults to CS260C_GATE_DETECTOR/GATE_DETECTOR "
+            "or classical."
+        ),
+    )
+    parser.add_argument(
+        "--model-path",
+        type=Path,
+        default=None,
+        help="ONNX model path for --detector onnx/gatenet.",
+    )
+    parser.add_argument(
+        "--detector-output",
+        default=None,
+        help="Neural output layout: corners8, bbox, center_distance, or heatmap.",
+    )
+    parser.add_argument(
+        "--detector-input-size",
+        default=None,
+        help="Neural network input size as WIDTHxHEIGHT, e.g. 320x180.",
+    )
+    parser.add_argument(
+        "--detector-normalized-output",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Whether neural coordinates are normalized to [0, 1].",
+    )
+    parser.add_argument(
+        "--detector-pixel-space",
+        choices=("input", "frame"),
+        default=None,
+        help="If coordinates are not normalized, whether they use input or frame pixels.",
+    )
+    parser.add_argument(
+        "--confidence-threshold",
+        type=float,
+        default=None,
+        help="Minimum confidence for neural detections.",
+    )
+    parser.add_argument(
+        "--camera-profile",
+        default=None,
+        help="Camera profile for bearing/range geometry, e.g. vq1_pinhole.",
+    )
     parser.add_argument(
         "--hsv-lo",
         type=parse_hsv,
@@ -361,6 +417,15 @@ def main() -> int:
         parser.error("Provide --source or --demo")
     if (args.hsv_lo is None) != (args.hsv_hi is None):
         parser.error("--hsv-lo and --hsv-hi must be provided together")
+    if args.detector in {"onnx", "gatenet"} and (args.hsv_lo is not None or args.hsv_hi is not None):
+        parser.error("--hsv-lo/--hsv-hi only apply to --detector classical")
+
+    detector_input_size = None
+    if args.detector_input_size is not None:
+        try:
+            detector_input_size = parse_input_size(args.detector_input_size)
+        except ValueError as exc:
+            parser.error(str(exc))
 
     out_dir = args.out_dir
     overlay_dir = out_dir / "overlays"
@@ -369,14 +434,36 @@ def main() -> int:
     if args.save_mask:
         mask_dir.mkdir(parents=True, exist_ok=True)
 
-    detector = GateDetector(
-        hsv_lo=args.hsv_lo,
-        hsv_hi=args.hsv_hi,
-        min_contour_area=args.min_area,
-    )
-    tracker = GateTracker(detector=detector, camera_params=CameraParams())
+    try:
+        config = detector_config_from_env(
+            kind=args.detector,
+            model_path=str(args.model_path) if args.model_path is not None else None,
+            output_format=args.detector_output,
+            input_size=detector_input_size,
+            min_confidence=args.confidence_threshold,
+            normalized_output=args.detector_normalized_output,
+            pixel_output_space=args.detector_pixel_space,
+            camera_profile=args.camera_profile,
+            hsv_lo=args.hsv_lo,
+            hsv_hi=args.hsv_hi,
+            min_contour_area=args.min_area,
+        )
+        if config.kind != "classical" and (args.hsv_lo is not None or args.hsv_hi is not None):
+            parser.error("--hsv-lo/--hsv-hi only apply to --detector classical")
+        detector = build_gate_detector(config)
+        camera_profile = get_camera_profile(config.camera_profile)
+    except (FileNotFoundError, ImportError, ValueError) as exc:
+        parser.error(str(exc))
+
+    tracker = GateTracker(detector=detector, camera_params=camera_profile.camera_params())
     pilot = AutonomousRacingPilot(tracker=tracker, frame_format="bgr")
     telemetry = VehicleTelemetry()
+    mask_supported = callable(getattr(detector, "mask", None))
+    if args.save_mask and not mask_supported:
+        print(
+            f"warning: --save-mask ignored because {config.kind} detector has no mask() method",
+            file=sys.stderr,
+        )
 
     fields = [
         "frame_id",
@@ -418,7 +505,7 @@ def main() -> int:
             overlay = draw_overlay(frame, gate, command, rc_fields, frame_id, timestamp_s)
             safe_name = f"{frame_id:06d}_{source_name}".replace("/", "_")
             cv2.imwrite(str(overlay_dir / f"{safe_name}.jpg"), overlay)
-            if args.save_mask:
+            if args.save_mask and mask_supported:
                 write_mask(frame, mask_dir / f"{safe_name}.png", detector)
             write_row(writer, frame_id, source_name, timestamp_s, gate, command, rc_fields)
             count += 1
@@ -428,9 +515,11 @@ def main() -> int:
 
     print(f"processed_frames={count}")
     print(f"usable_gate_frames={detections}")
+    print(f"detector={config.kind}")
+    print(f"camera_profile={camera_profile.name}")
     print(f"trace={trace_path}")
     print(f"overlays={overlay_dir}")
-    if args.save_mask:
+    if args.save_mask and mask_supported:
         print(f"masks={mask_dir}")
     return 0
 

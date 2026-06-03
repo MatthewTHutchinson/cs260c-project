@@ -12,21 +12,145 @@ index 3d426f5..9855d65 100644
      "opencv-python>=4.10.0",
      "pytest>=8.3.0",
 diff --git a/sim/camera.py b/sim/camera.py
-index 28782ce..0548059 100644
+index 28782ce..08a87db 100644
 --- a/sim/camera.py
 +++ b/sim/camera.py
-@@ -38,6 +38,10 @@ CAM_CY = 180.0
- CAM_FOV_VERT_DEG = 2.0 * math.degrees(math.atan(CAM_CY / CAM_FY))
- CAM_FOV_HORIZ_DEG = 2.0 * math.degrees(math.atan(CAM_CX / CAM_FX))
- CAM_TILT_UP_DEG = 20.0
+@@ -1,5 +1,5 @@
+ """
+-Forward FPV sensor camera matching the AI Grand Prix spec.
++Forward FPV sensor camera profiles for the AI Grand Prix practice harness.
+ 
+ Per VADR-TS-002 §3.8 (Issue 00.02, 2026-05-08):
+   - Resolution: 640 x 360
+@@ -24,20 +24,118 @@ context/agp-spec-reference.md §5 for the full reasoning.
+ 
+ from __future__ import annotations
+ 
++from dataclasses import dataclass
+ import math
++import os
+ 
+ import elodin as el
+ import numpy as np
+ 
+-CAM_WIDTH = 640
+-CAM_HEIGHT = 360
+-CAM_FX = 320.0
+-CAM_FY = 320.0
+-CAM_CX = 320.0
+-CAM_CY = 180.0
+-CAM_FOV_VERT_DEG = 2.0 * math.degrees(math.atan(CAM_CY / CAM_FY))
+-CAM_FOV_HORIZ_DEG = 2.0 * math.degrees(math.atan(CAM_CX / CAM_FX))
+-CAM_TILT_UP_DEG = 20.0
++
++@dataclass(frozen=True)
++class CameraProfile:
++    name: str
++    width: int
++    height: int
++    fx: float
++    fy: float
++    cx: float
++    cy: float
++    tilt_up_deg: float
++    lens_model: str
++    render_effect: str = "normal"
++
++    @property
++    def fov_vert_deg(self) -> float:
++        return 2.0 * math.degrees(math.atan(self.cy / self.fy))
++
++    @property
++    def fov_horiz_deg(self) -> float:
++        return 2.0 * math.degrees(math.atan(self.cx / self.fx))
++
++
++def _profile_from_vertical_fov(
++    *,
++    name: str,
++    width: int,
++    height: int,
++    vertical_fov_deg: float,
++    tilt_up_deg: float,
++    lens_model: str,
++    render_effect: str,
++) -> CameraProfile:
++    cx = width / 2.0
++    cy = height / 2.0
++    focal_px = cy / math.tan(math.radians(vertical_fov_deg) / 2.0)
++    return CameraProfile(
++        name=name,
++        width=width,
++        height=height,
++        fx=focal_px,
++        fy=focal_px,
++        cx=cx,
++        cy=cy,
++        tilt_up_deg=tilt_up_deg,
++        lens_model=lens_model,
++        render_effect=render_effect,
++    )
++
++
++VQ1_PINHOLE = CameraProfile(
++    name="vq1_pinhole",
++    width=640,
++    height=360,
++    fx=320.0,
++    fy=320.0,
++    cx=320.0,
++    cy=180.0,
++    tilt_up_deg=20.0,
++    lens_model="pinhole",
++    render_effect="normal",
++)
++
++GATENET_FISHEYE = _profile_from_vertical_fov(
++    name="gatenet_fisheye",
++    width=640,
++    height=360,
++    vertical_fov_deg=120.0,
++    tilt_up_deg=20.0,
++    lens_model="fisheye_wide_fov_experiment",
++    render_effect="fisheye",
++)
++
++CAMERA_PROFILES = {
++    profile.name: profile
++    for profile in (
++        VQ1_PINHOLE,
++        GATENET_FISHEYE,
++    )
++}
++
++
++def get_camera_profile(name: str | None = None) -> CameraProfile:
++    selected = name or os.environ.get("ELODIN_CAMERA_PROFILE") or VQ1_PINHOLE.name
++    key = selected.strip().lower()
++    if key not in CAMERA_PROFILES:
++        available = ", ".join(sorted(CAMERA_PROFILES))
++        raise ValueError(f"unknown camera profile '{selected}', available: {available}")
++    return CAMERA_PROFILES[key]
++
++
++ACTIVE_PROFILE = get_camera_profile()
++CAM_WIDTH = ACTIVE_PROFILE.width
++CAM_HEIGHT = ACTIVE_PROFILE.height
++CAM_FX = ACTIVE_PROFILE.fx
++CAM_FY = ACTIVE_PROFILE.fy
++CAM_CX = ACTIVE_PROFILE.cx
++CAM_CY = ACTIVE_PROFILE.cy
++CAM_FOV_VERT_DEG = ACTIVE_PROFILE.fov_vert_deg
++CAM_FOV_HORIZ_DEG = ACTIVE_PROFILE.fov_horiz_deg
++CAM_TILT_UP_DEG = ACTIVE_PROFILE.tilt_up_deg
 +# Elodin's sensor_camera pitch offset uses the opposite sign from the AGP
 +# "camera tilted upward" wording in our ENU/FLU harness. Negative pitch here
 +# points the optical axis upward relative to the drone body.
 +ELODIN_ROT_OFFSET_PITCH_DEG = -CAM_TILT_UP_DEG
  TARGET_FPS = 30.0
-
+ 
  CAMERA_NAME = "fpv"
-@@ -51,9 +55,6 @@ def register(world: el.World, drone: el.EntityId) -> str:
+@@ -51,9 +149,6 @@ def register(world: el.World, drone: el.EntityId) -> str:
      Returns the full DB component name (`drone.fpv`) for use with
      `request_render()` / `collect_frame()` in the post_step callback.
      """
@@ -36,7 +160,7 @@ index 28782ce..0548059 100644
      world.sensor_camera(
          entity=drone,
          name=CAMERA_NAME,
-@@ -61,14 +62,15 @@ def register(world: el.World, drone: el.EntityId) -> str:
+@@ -61,14 +156,16 @@ def register(world: el.World, drone: el.EntityId) -> str:
          height=CAM_HEIGHT,
          fov=CAM_FOV_VERT_DEG,
          near=0.02,
@@ -46,6 +170,7 @@ index 28782ce..0548059 100644
 -        look_at_offset=look_at,
 +        rot_offset=[0.0, ELODIN_ROT_OFFSET_PITCH_DEG, 0.0],
          format="rgba",
++        effect=ACTIVE_PROFILE.render_effect,
          create_frustum=True,
          frustums_color=[0.0, 1.0, 0.4, 0.4],
          projection_color=[0.0, 1.0, 0.4, 0.1],
@@ -53,11 +178,11 @@ index 28782ce..0548059 100644
 +        fps=TARGET_FPS,
      )
      return DB_NAME
-
-@@ -78,19 +80,23 @@ def render_every_n_ticks(pid_rate_hz: float) -> int:
+ 
+@@ -78,19 +175,23 @@ def render_every_n_ticks(pid_rate_hz: float) -> int:
      return max(1, round(pid_rate_hz / TARGET_FPS))
-
-
+ 
+ 
 -def request_render(ctx: el.StepContext, name: str) -> None:
 -    """Trigger a render request for a sensor camera.
 -
@@ -74,11 +199,11 @@ index 28782ce..0548059 100644
 -    if frame is None or len(frame) == 0:
 +def _frame_array(frame: object) -> np.ndarray | None:
 +    if frame is None:
-         return None
--    return np.asarray(frame).reshape(CAM_HEIGHT, CAM_WIDTH, 4)
++        return None
 +    image = np.asarray(frame, dtype=np.uint8)
 +    if image.size == 0:
-+        return None
+         return None
+-    return np.asarray(frame).reshape(CAM_HEIGHT, CAM_WIDTH, 4)
 +    expected_size = CAM_HEIGHT * CAM_WIDTH * 4
 +    if image.shape == (CAM_HEIGHT, CAM_WIDTH, 4):
 +        return image
@@ -100,13 +225,13 @@ index 4a5df72..5c1265d 100644
 @@ -15,6 +15,7 @@ The drone starts at the ENU origin. The default course places vertical gates
  straight ahead along +X (East) at hover altitude.
  """
-
+ 
 +import math
  import typing as ty
  from dataclasses import dataclass, field
  from typing import Optional, Tuple
 @@ -41,8 +42,8 @@ class Gate:
-
+ 
      `index` is the order in which it must be passed (0 = first).
      `center` is the world-frame (ENU) position of the gate's center.
 -    `yaw_deg` is reserved for future rotated courses. Today all gates are
@@ -114,12 +239,12 @@ index 4a5df72..5c1265d 100644
 +    `yaw_deg` rotates the gate plane about ENU Z. Zero means the opening faces
 +        +X; positive yaw bends the course toward +Y.
      """
-
+ 
      index: int
 @@ -50,14 +51,67 @@ class Gate:
      yaw_deg: float = 0.0
-
-
+ 
+ 
 -# 3 AGP-style vertical gates straight ahead at hover altitude. Elodin uses
 -# ENU world coordinates, so +X is East and +Z is Up.
 +# AGP-style vertical gates. Elodin uses ENU world coordinates, so +X is East
@@ -130,7 +255,7 @@ index 4a5df72..5c1265d 100644
      Gate(1, (20.0, 0.0, 1.8)),
      Gate(2, (30.0, 0.0, 1.8)),
  )
-
+ 
 +LATERAL_SOFT_COURSE: Tuple[Gate, ...] = (
 +    Gate(0, (10.0, 0.0, 1.8)),
 +    Gate(1, (20.0, 0.35, 1.8)),
@@ -189,7 +314,7 @@ index 4a5df72..5c1265d 100644
 @@ -106,12 +160,10 @@ class GateProgress(el.Archetype):
  # file just lives in `assets/` and is referenced by name.
  GATE_ASSET = "gate.glb"
-
+ 
 -# Base rotation applied to every gate GLB. The model is authored facing
 -# along its native Y axis; rotating 90° about Y orients the opening to face
 -# +X (East) in our ENU world. Per-gate `Gate.yaw_deg` is currently always 0;
@@ -200,8 +325,8 @@ index 4a5df72..5c1265d 100644
 +# its native Y axis; rotating 90 degrees about Y orients the opening to face +X
 +# (East) in our ENU world. Per-gate yaw is then applied about ENU Z.
 +GATE_BASE_PITCH_DEG = 90.0
-
-
+ 
+ 
  def gate_name(index: int) -> str:
 @@ -164,7 +216,7 @@ def schematic_for(course: Tuple[Gate, ...]) -> str:
      for g in course:
@@ -214,7 +339,7 @@ index 4a5df72..5c1265d 100644
      return "\n".join(blocks)
 @@ -179,8 +231,8 @@ def detect_gate_pass(
      """Return the index of the next gate that was just crossed, else None.
-
+ 
      A pass requires:
 -      - Drone crossed the next-in-order gate's X plane moving forward.
 -      - Crossing point was inside the inner 1.5 x 1.5 square in Y/Z.
@@ -245,8 +370,8 @@ index 4a5df72..5c1265d 100644
 +    if abs(lateral_dist) > half or abs(cz - gz) > GATE_INNER_H / 2.0:
          return None
      return next_idx
-
-
+ 
+ 
  def print_summary(
 +    course_name: str,
      course: Tuple[Gate, ...],
@@ -262,21 +387,21 @@ index 4a5df72..5c1265d 100644
      )
      print(line)
 diff --git a/sim/main.py b/sim/main.py
-index f60ddd1..27588cc 100644
+index f60ddd1..a98a3e7 100644
 --- a/sim/main.py
 +++ b/sim/main.py
 @@ -15,6 +15,7 @@ Prerequisites:
         uv run python scripts/configure_betaflight.py
  """
-
+ 
 +import atexit
  import importlib
  import os
  import re
 @@ -54,9 +55,33 @@ except AttributeError:
      pass
-
-
+ 
+ 
 +def _env_bool(name: str, default: bool) -> bool:
 +    raw = os.environ.get(name)
 +    if raw is None:
@@ -295,7 +420,7 @@ index f60ddd1..27588cc 100644
 +config.simulation_time = _env_float("ELODIN_SIM_TIME", config.simulation_time)
 +config.fpv_rate = _env_float("ELODIN_FPV_RATE", config.fpv_rate)
  config.set_as_global()
-
+ 
 +ENABLE_FPV_RENDER = _env_bool("ELODIN_ENABLE_FPV", True)
 +GENERATE_REAL_TIME = _env_bool("ELODIN_REAL_TIME", True)
 +INTERACTIVE_RUN = _env_bool("ELODIN_INTERACTIVE", True)
@@ -306,11 +431,11 @@ index f60ddd1..27588cc 100644
 +
  REPO_ROOT = _REPO_ROOT
  BETAFLIGHT_PATH = REPO_ROOT / "betaflight" / "obj" / "main" / "betaflight_SITL.elf"
-
+ 
 @@ -78,14 +103,65 @@ def cleanup_stale_betaflight():
          pass
-
-
+ 
+ 
 -if "--no-s10" not in sys.argv:
 +_inline_betaflight_process: subprocess.Popen | None = None
 +_inline_betaflight_log = None
@@ -362,10 +487,10 @@ index f60ddd1..27588cc 100644
 +
 +if not MANAGE_BETAFLIGHT_INLINE and "--no-s10" not in sys.argv:
      cleanup_stale_betaflight()
-
-
+ 
+ 
  world = el.World()
-
+ 
 -# Active race course: straight ahead along ENU +X at hover altitude.
 -ACTIVE_COURSE = race_course.EASY_COURSE
 +# Active race course. This only affects simulator spawning/scoring; the solver
@@ -373,13 +498,22 @@ index f60ddd1..27588cc 100644
 +COURSE_NAME = os.environ.get("ELODIN_COURSE", "easy").strip().lower()
 +ACTIVE_COURSE = race_course.course_by_name(COURSE_NAME)
 +print(f"[CFG] Race course: {COURSE_NAME} ({len(ACTIVE_COURSE)} gates)")
-
+ 
  drone = world.spawn(
      [
-@@ -180,20 +256,26 @@ visualization = create_visualization_system(config)
+@@ -116,7 +192,7 @@ drone = world.spawn(
+ # names resolve when the schematic is registered.
+ gate_ids = race_course.spawn_gates(world, ACTIVE_COURSE)
+ 
+-# Attach a forward FPV camera matching the AI Grand Prix VADR-TS-002 spec.
++# Attach the selected forward FPV camera profile.
+ FPV_CAM_NAME = fpv_camera.register(world, drone)
+ RENDER_EVERY = config.fpv_tick_interval
+ 
+@@ -180,20 +256,33 @@ visualization = create_visualization_system(config)
  system = physics | sensors | visualization
-
-
+ 
+ 
 -# Register Betaflight SITL as an s10 process recipe so s10 manages its
 -# lifecycle (start/stop) in every execution context.
 -betaflight_recipe = el.s10.PyRecipe.process(
@@ -397,9 +531,16 @@ index f60ddd1..27588cc 100644
 +        cwd=str(REPO_ROOT),
 +    )
 +    world.recipe(betaflight_recipe)
-
+ 
  print(f"[CFG] Betaflight SITL: {BETAFLIGHT_PATH.name}")
  print(f"[CFG] Simulation: {config.simulation_time}s at {config.pid_rate:.0f}Hz PID loop")
++print(
++    f"[CFG] Camera profile: {fpv_camera.ACTIVE_PROFILE.name} "
++    f"lens={fpv_camera.ACTIVE_PROFILE.lens_model} "
++    f"effect={fpv_camera.ACTIVE_PROFILE.render_effect} "
++    f"fov_v={fpv_camera.CAM_FOV_VERT_DEG:.1f}deg "
++    f"fov_h={fpv_camera.CAM_FOV_HORIZ_DEG:.1f}deg"
++)
  print(
      f"[CFG] Sensor rates: gyro={config.gyro_rate:.0f}Hz, accel={config.accel_rate:.0f}Hz, baro={config.baro_rate:.0f}Hz, mag={config.mag_rate:.0f}Hz"
  )
@@ -408,11 +549,11 @@ index f60ddd1..27588cc 100644
 +    f"real_time={GENERATE_REAL_TIME} interactive={INTERACTIVE_RUN} "
 +    f"inline_betaflight={MANAGE_BETAFLIGHT_INLINE}"
 +)
-
-
+ 
+ 
  @dataclass
-@@ -254,6 +336,8 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
-
+@@ -254,6 +343,8 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
+ 
      # Lazy initialization - only start bridge when first tick runs
      if bridge[0] is None or not getattr(bridge[0], "_started", False):
 +        if MANAGE_BETAFLIGHT_INLINE:
@@ -420,10 +561,10 @@ index f60ddd1..27588cc 100644
          print("[SITL] Initializing bridge...")
          pending_bridge = BetaflightSyncBridge(timeout_ms=100)
          sensor_buf[0] = SensorDataBuffer()
-@@ -365,33 +449,32 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
+@@ -365,33 +456,32 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
      except TimeoutError:
          pass
-
+ 
 -    # Request a camera frame at the configured FPV rate, then collect the latest
 -    # frame from the message log. The solver still runs every tick and can tell
 -    # whether the frame is new using frame_fresh.
@@ -444,7 +585,7 @@ index f60ddd1..27588cc 100644
              if tick % max(1, int(config.pid_rate)) == 0:
 -                print(f"[FPV] render trigger failed at tick {tick}: {e}")
 +                print(f"[FPV] collect error at tick {tick}: {e}")
-
+ 
 -    try:
 -        frame = fpv_camera.collect_frame(ctx, FPV_CAM_NAME)
 -        if frame is not None and tick == _last_render_tick[0]:
@@ -472,27 +613,27 @@ index f60ddd1..27588cc 100644
 +                f"nonzero={int(np.count_nonzero(frame))}"
 +            )
 +            _fpv_first_logged[0] = True
-
+ 
      next_gate_index = (
          _race_last_gate[0] + 1
-@@ -489,6 +572,7 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
+@@ -489,6 +579,7 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
      if tick >= MAX_TICKS - 1:
          _completed[0] = True
          b.stop()
 +        stop_inline_betaflight()
          elapsed = time.time() - start_time[0]
-
+ 
          # Read final position
-@@ -529,6 +613,7 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
+@@ -529,6 +620,7 @@ def sitl_post_step(tick: int, ctx: el.StepContext):
              print("WARNING: No motor response. Check Betaflight configuration.")
-
+ 
          race_course.print_summary(
 +            COURSE_NAME,
              ACTIVE_COURSE,
              _race_last_gate[0],
              _race_pass_times,
-@@ -559,16 +644,21 @@ def next_filename(pattern: str) -> str:
-
+@@ -559,16 +651,21 @@ def next_filename(pattern: str) -> str:
+ 
  db_filename = next_filename("betaflight_dbXXX")
  print(f"Writing database to: {db_filename}")
 -world.run(
@@ -520,17 +661,41 @@ index f60ddd1..27588cc 100644
 +    if bridge[0] is not None:
 +        bridge[0].stop()
 +    stop_inline_betaflight()
-
+ 
  if not bridge[0]:
      print("\nNo simulation ticks executed.")
 diff --git a/tests/test_camera_shape.py b/tests/test_camera_shape.py
-index 65c9eac..4c917b1 100644
+index 65c9eac..51d3fe6 100644
 --- a/tests/test_camera_shape.py
 +++ b/tests/test_camera_shape.py
-@@ -67,9 +67,6 @@ def test_register_attaches_camera_without_errors():
+@@ -15,6 +15,7 @@ from sim import camera as fpv_camera
+ 
+ 
+ def test_camera_intrinsics_match_agp_spec():
++    assert fpv_camera.ACTIVE_PROFILE.name == "vq1_pinhole"
+     assert fpv_camera.CAM_WIDTH == 640
+     assert fpv_camera.CAM_HEIGHT == 360
+     assert fpv_camera.CAM_FX == 320.0
+@@ -24,6 +25,15 @@ def test_camera_intrinsics_match_agp_spec():
+     assert fpv_camera.CAM_TILT_UP_DEG == 20.0
+ 
+ 
++def test_gatenet_fisheye_profile_is_available():
++    profile = fpv_camera.get_camera_profile("gatenet_fisheye")
++    assert profile.width == 640
++    assert profile.height == 360
++    assert profile.render_effect == "fisheye"
++    assert profile.fov_vert_deg > fpv_camera.VQ1_PINHOLE.fov_vert_deg
++    assert profile.fov_horiz_deg > fpv_camera.VQ1_PINHOLE.fov_horiz_deg
++
++
+ def test_vfov_is_consistent_with_intrinsics():
+     expected_vfov = 2.0 * math.degrees(
+         math.atan(fpv_camera.CAM_CY / fpv_camera.CAM_FY)
+@@ -67,9 +77,6 @@ def test_register_attaches_camera_without_errors():
      assert name == "drone.fpv"
-
-
+ 
+ 
 -def test_camera_tilt_vector_is_unit():
 -    """Sanity check: the look_at_offset we use should be a unit vector."""
 -    rad = math.radians(fpv_camera.CAM_TILT_UP_DEG)
@@ -546,8 +711,8 @@ index 2f937f1..26fc975 100644
 +++ b/tests/test_course.py
 @@ -41,6 +41,21 @@ def test_x_gate_no_pass_when_already_done():
      assert detect_gate_pass(gate_x, 0, (4.0, 0.0, 1.5), (6.0, 0.0, 1.5)) is None
-
-
+ 
+ 
 +def test_yawed_gate_pass_centered():
 +    gate_y = (Gate(0, (0.0, 5.0, 1.5), yaw_deg=90.0),)
 +    assert detect_gate_pass(gate_y, -1, (0.0, 4.0, 1.5), (0.0, 6.0, 1.5)) == 0
@@ -574,10 +739,10 @@ index ddc6bce..60787d7 100644
  version = 1
 +revision = 3
  requires-python = ">=3.13"
-
+ 
  [[package]]
 @@ -14,7 +15,7 @@ dependencies = [
-
+ 
  [package.metadata]
  requires-dist = [
 -    { name = "elodin", specifier = "==0.17.2" },
@@ -595,7 +760,7 @@ index ddc6bce..60787d7 100644
 -    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335 },
 +    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
  ]
-
+ 
  [[package]]
 @@ -36,66 +37,66 @@ source = { registry = "https://pypi.org/simple" }
  dependencies = [
@@ -693,7 +858,7 @@ index ddc6bce..60787d7 100644
 +    { url = "https://files.pythonhosted.org/packages/fa/96/fd9f641ffedc4fa3ace923af73b9d07e869496c9cc7a459103e6e978992f/contourpy-1.3.3-cp314-cp314t-win_amd64.whl", hash = "sha256:13b68d6a62db8eafaebb8039218921399baf6e47bf85006fd8529f2a08ef33fc", size = 250331, upload-time = "2025-07-26T12:02:50.137Z" },
 +    { url = "https://files.pythonhosted.org/packages/ae/8c/469afb6465b853afff216f9528ffda78a915ff880ed58813ba4faf4ba0b6/contourpy-1.3.3-cp314-cp314t-win_arm64.whl", hash = "sha256:b7448cb5a725bb1e35ce88771b86fba35ef418952474492cf7c764059933ff8b", size = 203831, upload-time = "2025-07-26T12:02:51.449Z" },
  ]
-
+ 
  [[package]]
  name = "cycler"
  version = "0.12.1"
@@ -704,7 +869,7 @@ index ddc6bce..60787d7 100644
 -    { url = "https://files.pythonhosted.org/packages/e7/05/c19819d5e3d95294a6f5947fb9b9629efb316b96de511b418c53d245aae6/cycler-0.12.1-py3-none-any.whl", hash = "sha256:85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30", size = 8321 },
 +    { url = "https://files.pythonhosted.org/packages/e7/05/c19819d5e3d95294a6f5947fb9b9629efb316b96de511b418c53d245aae6/cycler-0.12.1-py3-none-any.whl", hash = "sha256:85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30", size = 8321, upload-time = "2023-10-07T05:32:16.783Z" },
  ]
-
+ 
  [[package]]
  name = "elodin"
 -version = "0.17.2"
@@ -721,7 +886,7 @@ index ddc6bce..60787d7 100644
 +    { url = "https://files.pythonhosted.org/packages/72/fc/47c0910877d325ebb4e7856c73ec0432fc45559469e71b5bbcc90492181d/elodin-0.17.3-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:88c9df8021fb4e484df5281b9c240d555ccd34f277966ad84b49bab69be8e657", size = 31662496, upload-time = "2026-05-22T19:44:01.878Z" },
 +    { url = "https://files.pythonhosted.org/packages/0c/60/a6d7bcf75db607acac2794e463f8e2f877f73cb4ab95c6b2a9a61de590e2/elodin-0.17.3-cp310-abi3-manylinux_2_35_x86_64.whl", hash = "sha256:b51b2dbed12ca00105c4e24b0baeae0f985b4361865ef24907f0250be4783e57", size = 36123055, upload-time = "2026-05-22T19:43:57.901Z" },
  ]
-
+ 
  [[package]]
  name = "fonttools"
  version = "4.62.1"
@@ -780,7 +945,7 @@ index ddc6bce..60787d7 100644
 +    { url = "https://files.pythonhosted.org/packages/13/6f/ae9c4e4dd417948407b680855c2c7790efb52add6009aaecff1e3bc50e8e/fonttools-4.62.1-cp314-cp314t-win_amd64.whl", hash = "sha256:59b372b4f0e113d3746b88985f1c796e7bf830dd54b28374cd85c2b8acd7583e", size = 2414147, upload-time = "2026-03-13T13:54:19.416Z" },
 +    { url = "https://files.pythonhosted.org/packages/fd/ba/56147c165442cc5ba7e82ecf301c9a68353cede498185869e6e02b4c264f/fonttools-4.62.1-py3-none-any.whl", hash = "sha256:7487782e2113861f4ddcc07c3436450659e3caa5e470b27dc2177cade2d8e7fd", size = 1152647, upload-time = "2026-03-13T13:54:22.735Z" },
  ]
-
+ 
  [[package]]
  name = "iniconfig"
  version = "2.3.0"
@@ -791,7 +956,7 @@ index ddc6bce..60787d7 100644
 -    { url = "https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12", size = 7484 },
 +    { url = "https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12", size = 7484, upload-time = "2025-10-18T21:55:41.639Z" },
  ]
-
+ 
  [[package]]
 @@ -163,9 +164,9 @@ dependencies = [
      { name = "opt-einsum" },
@@ -803,7 +968,7 @@ index ddc6bce..60787d7 100644
 -    { url = "https://files.pythonhosted.org/packages/f9/e7/19b8cfc8963b2e10a01a4db7bb27ec5fa39ecd024bc62f8e2d1de5625a9d/jax-0.8.1-py3-none-any.whl", hash = "sha256:4cbdc5548f3095cdd69d38e4337950b2fc1f250a740a0234d190e4a319077564", size = 2922137 },
 +    { url = "https://files.pythonhosted.org/packages/f9/e7/19b8cfc8963b2e10a01a4db7bb27ec5fa39ecd024bc62f8e2d1de5625a9d/jax-0.8.1-py3-none-any.whl", hash = "sha256:4cbdc5548f3095cdd69d38e4337950b2fc1f250a740a0234d190e4a319077564", size = 2922137, upload-time = "2025-11-18T19:47:43.693Z" },
  ]
-
+ 
  [[package]]
 @@ -178,91 +179,87 @@ dependencies = [
      { name = "scipy" },
@@ -838,7 +1003,7 @@ index ddc6bce..60787d7 100644
 +    { url = "https://files.pythonhosted.org/packages/61/c7/13d13a6f0b0d2e91431d6a031129d51ea4b23af23bb947882234ed003f09/jaxlib-0.8.1-cp314-cp314t-manylinux_2_27_aarch64.whl", hash = "sha256:1bc76edec2bc74a7adb5e29329ece51a67c57cd011a06d55d07da62fbabe3389", size = 74320131, upload-time = "2025-11-18T19:49:56.208Z" },
 +    { url = "https://files.pythonhosted.org/packages/cd/8a/6cad418c0f11ce0cffa2b74b81fb76e6cf30247288fea75a372b6b163f2e/jaxlib-0.8.1-cp314-cp314t-manylinux_2_27_x86_64.whl", hash = "sha256:117f2fe2c19479e560ad85a3ef2fcc0b1d24816456f0d039f865c2acbab63b5a", size = 80360481, upload-time = "2025-11-18T19:50:00.065Z" },
  ]
-
+ 
  [[package]]
  name = "kiwisolver"
  version = "1.5.0"
@@ -969,7 +1134,7 @@ index ddc6bce..60787d7 100644
 +    { url = "https://files.pythonhosted.org/packages/3b/b5/98222136d839b8afabcaa943b09bd05888c2d36355b7e448550211d1fca4/kiwisolver-1.5.0-cp314-cp314t-win_amd64.whl", hash = "sha256:1dd9b0b119a350976a6d781e7278ec7aca0b201e1a9e2d23d9804afecb6ca681", size = 79687, upload-time = "2026-03-09T13:15:33.204Z" },
 +    { url = "https://files.pythonhosted.org/packages/99/a2/ca7dc962848040befed12732dff6acae7fb3c4f6fc4272b3f6c9a30b8713/kiwisolver-1.5.0-cp314-cp314t-win_arm64.whl", hash = "sha256:58f812017cd2985c21fbffb4864d59174d4903dd66fa23815e74bbc7a0e2dd57", size = 70032, upload-time = "2026-03-09T13:15:34.411Z" },
  ]
-
+ 
  [[package]]
 @@ -280,36 +277,36 @@ dependencies = [
      { name = "pyparsing" },
@@ -1035,7 +1200,7 @@ index ddc6bce..60787d7 100644
 +    { url = "https://files.pythonhosted.org/packages/61/1c/d21bfeb9931881ebe96bcfcff27c7ae4b160ae0ec291a714c42641a56d75/matplotlib-3.10.9-cp314-cp314t-win_amd64.whl", hash = "sha256:c27df8b3848f32a83d1767566595e43cfaa4460380974da06f4279a7ec143c39", size = 8432333, upload-time = "2026-04-24T00:13:51.008Z" },
 +    { url = "https://files.pythonhosted.org/packages/78/23/92493c3e6e1b635ccfff146f7b99e674808787915420373ac399283764c2/matplotlib-3.10.9-cp314-cp314t-win_arm64.whl", hash = "sha256:a49f1eadc84ca85fd72fa4e89e70e61bf86452df6f971af04b12c60761a0772c", size = 8324785, upload-time = "2026-04-24T00:13:53.633Z" },
  ]
-
+ 
  [[package]]
 @@ -319,78 +316,78 @@ source = { registry = "https://pypi.org/simple" }
  dependencies = [
@@ -1085,7 +1250,7 @@ index ddc6bce..60787d7 100644
 +    { url = "https://files.pythonhosted.org/packages/84/44/f4d18446eacb20ea11e82f133ea8f86e2bf2891785b67d9da8d0ab0ef525/ml_dtypes-0.5.4-cp314-cp314t-win_amd64.whl", hash = "sha256:4381fe2f2452a2d7589689693d3162e876b3ddb0a832cde7a414f8e1adf7eab1", size = 236612, upload-time = "2025-11-17T22:32:22.579Z" },
 +    { url = "https://files.pythonhosted.org/packages/ad/3f/3d42e9a78fe5edf792a83c074b13b9b770092a4fbf3462872f4303135f09/ml_dtypes-0.5.4-cp314-cp314t-win_arm64.whl", hash = "sha256:11942cbf2cf92157db91e5022633c0d9474d4dfd813a909383bd23ce828a4b7d", size = 168825, upload-time = "2025-11-17T22:32:23.766Z" },
  ]
-
+ 
  [[package]]
  name = "numpy"
  version = "2.4.4"
@@ -1178,7 +1343,7 @@ index ddc6bce..60787d7 100644
 +    { url = "https://files.pythonhosted.org/packages/c7/03/2fc4e14c7bd4ff2964b74ba90ecb8552540b6315f201df70f137faa5c589/numpy-2.4.4-cp314-cp314t-win_amd64.whl", hash = "sha256:a7164afb23be6e37ad90b2f10426149fd75aee07ca55653d2aa41e66c4ef697e", size = 12637755, upload-time = "2026-03-29T13:21:31.107Z" },
 +    { url = "https://files.pythonhosted.org/packages/58/78/548fb8e07b1a341746bfbecb32f2c268470f45fa028aacdbd10d9bc73aab/numpy-2.4.4-cp314-cp314t-win_arm64.whl", hash = "sha256:ba203255017337d39f89bdd58417f03c4426f12beed0440cfd933cb15f8669c7", size = 10566643, upload-time = "2026-03-29T13:21:34.339Z" },
  ]
-
+ 
  [[package]]
 @@ -401,99 +398,99 @@ dependencies = [
      { name = "numpy" },
@@ -1201,7 +1366,7 @@ index ddc6bce..60787d7 100644
 +    { url = "https://files.pythonhosted.org/packages/fb/17/de5458312bcb07ddf434d7bfcb24bb52c59635ad58c6e7c751b48949b009/opencv_python-4.13.0.92-cp37-abi3-win32.whl", hash = "sha256:372fe164a3148ac1ca51e5f3ad0541a4a276452273f503441d718fab9c5e5f59", size = 30932638, upload-time = "2026-02-05T07:02:14.98Z" },
 +    { url = "https://files.pythonhosted.org/packages/e9/a5/1be1516390333ff9be3a9cb648c9f33df79d5096e5884b5df71a588af463/opencv_python-4.13.0.92-cp37-abi3-win_amd64.whl", hash = "sha256:423d934c9fafb91aad38edf26efb46da91ffbc05f3f59c4b0c72e699720706f5", size = 40212062, upload-time = "2026-02-05T07:02:12.724Z" },
  ]
-
+ 
  [[package]]
  name = "opt-einsum"
  version = "3.4.0"
@@ -1212,7 +1377,7 @@ index ddc6bce..60787d7 100644
 -    { url = "https://files.pythonhosted.org/packages/23/cd/066e86230ae37ed0be70aae89aabf03ca8d9f39c8aea0dec8029455b5540/opt_einsum-3.4.0-py3-none-any.whl", hash = "sha256:69bb92469f86a1565195ece4ac0323943e83477171b91d24c35afe028a90d7cd", size = 71932 },
 +    { url = "https://files.pythonhosted.org/packages/23/cd/066e86230ae37ed0be70aae89aabf03ca8d9f39c8aea0dec8029455b5540/opt_einsum-3.4.0-py3-none-any.whl", hash = "sha256:69bb92469f86a1565195ece4ac0323943e83477171b91d24c35afe028a90d7cd", size = 71932, upload-time = "2024-09-26T14:33:23.039Z" },
  ]
-
+ 
  [[package]]
  name = "packaging"
  version = "26.2"
@@ -1223,7 +1388,7 @@ index ddc6bce..60787d7 100644
 -    { url = "https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl", hash = "sha256:5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e", size = 100195 },
 +    { url = "https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl", hash = "sha256:5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e", size = 100195, upload-time = "2026-04-24T20:15:22.081Z" },
  ]
-
+ 
  [[package]]
  name = "pillow"
  version = "12.2.0"
@@ -1332,7 +1497,7 @@ index ddc6bce..60787d7 100644
 +    { url = "https://files.pythonhosted.org/packages/ba/13/306d275efd3a3453f72114b7431c877d10b1154014c1ebbedd067770d629/pillow-12.2.0-cp314-cp314t-win_amd64.whl", hash = "sha256:6562ace0d3fb5f20ed7290f1f929cae41b25ae29528f2af1722966a0a02e2aa1", size = 7225152, upload-time = "2026-04-01T14:45:50.032Z" },
 +    { url = "https://files.pythonhosted.org/packages/ff/6e/cf826fae916b8658848d7b9f38d88da6396895c676e8086fc0988073aaf8/pillow-12.2.0-cp314-cp314t-win_arm64.whl", hash = "sha256:aa88ccfe4e32d362816319ed727a004423aab09c5cea43c01a4b435643fa34eb", size = 2556579, upload-time = "2026-04-01T14:45:52.529Z" },
  ]
-
+ 
  [[package]]
  name = "pluggy"
  version = "1.6.0"
@@ -1343,7 +1508,7 @@ index ddc6bce..60787d7 100644
 -    { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538 },
 +    { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
  ]
-
+ 
  [[package]]
 @@ -503,43 +500,43 @@ source = { registry = "https://pypi.org/simple" }
  dependencies = [
@@ -1355,7 +1520,7 @@ index ddc6bce..60787d7 100644
 -    { url = "https://files.pythonhosted.org/packages/ea/91/74fc60d94488685a92ac9d49d7ec55f3e91fe9b77942a6235a5fa7f249c3/polars-1.40.1-py3-none-any.whl", hash = "sha256:c0f861219d1319cdea45c4ce4d30355a47176b8f98dcedf95ea8269f131b8abd", size = 828723 },
 +    { url = "https://files.pythonhosted.org/packages/ea/91/74fc60d94488685a92ac9d49d7ec55f3e91fe9b77942a6235a5fa7f249c3/polars-1.40.1-py3-none-any.whl", hash = "sha256:c0f861219d1319cdea45c4ce4d30355a47176b8f98dcedf95ea8269f131b8abd", size = 828723, upload-time = "2026-04-22T19:14:25.452Z" },
  ]
-
+ 
  [[package]]
  name = "polars-runtime-32"
  version = "1.40.1"
@@ -1380,7 +1545,7 @@ index ddc6bce..60787d7 100644
 +    { url = "https://files.pythonhosted.org/packages/06/d9/d091d8fb5cbed5e9536adfed955c4c89987a4cc3b8e73ae4532402b91c74/polars_runtime_32-1.40.1-cp310-abi3-win_amd64.whl", hash = "sha256:f78bb2abd00101cbb23cc0cb068f7e36e081057a15d2ec2dde3dda280709f030", size = 51829755, upload-time = "2026-04-22T19:14:50.85Z" },
 +    { url = "https://files.pythonhosted.org/packages/65/ad/b33c3022a394f3eb55c3310597cec615412a8a33880055eee191d154a628/polars_runtime_32-1.40.1-cp310-abi3-win_arm64.whl", hash = "sha256:b5cbfaf6b085b420b4bfcbe24e8f665076d1cccfdb80c0484c02a023ce205537", size = 45822104, upload-time = "2026-04-22T19:14:54.192Z" },
  ]
-
+ 
  [[package]]
  name = "pygments"
  version = "2.20.0"
@@ -1391,7 +1556,7 @@ index ddc6bce..60787d7 100644
 -    { url = "https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176", size = 1231151 },
 +    { url = "https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176", size = 1231151, upload-time = "2026-03-29T13:29:30.038Z" },
  ]
-
+ 
  [[package]]
  name = "pyparsing"
  version = "3.3.2"
@@ -1402,7 +1567,7 @@ index ddc6bce..60787d7 100644
 -    { url = "https://files.pythonhosted.org/packages/10/bd/c038d7cc38edc1aa5bf91ab8068b63d4308c66c4c8bb3cbba7dfbc049f9c/pyparsing-3.3.2-py3-none-any.whl", hash = "sha256:850ba148bd908d7e2411587e247a1e4f0327839c40e2e5e6d05a007ecc69911d", size = 122781 },
 +    { url = "https://files.pythonhosted.org/packages/10/bd/c038d7cc38edc1aa5bf91ab8068b63d4308c66c4c8bb3cbba7dfbc049f9c/pyparsing-3.3.2-py3-none-any.whl", hash = "sha256:850ba148bd908d7e2411587e247a1e4f0327839c40e2e5e6d05a007ecc69911d", size = 122781, upload-time = "2026-01-21T03:57:55.912Z" },
  ]
-
+ 
  [[package]]
 @@ -553,9 +550,9 @@ dependencies = [
      { name = "pluggy" },
@@ -1414,7 +1579,7 @@ index ddc6bce..60787d7 100644
 -    { url = "https://files.pythonhosted.org/packages/d4/24/a372aaf5c9b7208e7112038812994107bc65a84cd00e0354a88c2c77a617/pytest-9.0.3-py3-none-any.whl", hash = "sha256:2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9", size = 375249 },
 +    { url = "https://files.pythonhosted.org/packages/d4/24/a372aaf5c9b7208e7112038812994107bc65a84cd00e0354a88c2c77a617/pytest-9.0.3-py3-none-any.whl", hash = "sha256:2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9", size = 375249, upload-time = "2026-04-07T17:16:16.13Z" },
  ]
-
+ 
  [[package]]
 @@ -565,9 +562,9 @@ source = { registry = "https://pypi.org/simple" }
  dependencies = [
@@ -1426,7 +1591,7 @@ index ddc6bce..60787d7 100644
 -    { url = "https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427", size = 229892 },
 +    { url = "https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427", size = 229892, upload-time = "2024-03-01T18:36:18.57Z" },
  ]
-
+ 
  [[package]]
 @@ -577,64 +574,64 @@ source = { registry = "https://pypi.org/simple" }
  dependencies = [
@@ -1516,7 +1681,7 @@ index ddc6bce..60787d7 100644
 +    { url = "https://files.pythonhosted.org/packages/11/2f/b29eafe4a3fbc3d6de9662b36e028d5f039e72d345e05c250e121a230dd4/scipy-1.17.1-cp314-cp314t-win_amd64.whl", hash = "sha256:eb092099205ef62cd1782b006658db09e2fed75bffcae7cc0d44052d8aa0f484", size = 37345327, upload-time = "2026-02-23T00:22:24.442Z" },
 +    { url = "https://files.pythonhosted.org/packages/07/39/338d9219c4e87f3e708f18857ecd24d22a0c3094752393319553096b98af/scipy-1.17.1-cp314-cp314t-win_arm64.whl", hash = "sha256:200e1050faffacc162be6a486a984a0497866ec54149a01270adc8a59b7c7d21", size = 25489165, upload-time = "2026-02-23T00:22:29.563Z" },
  ]
-
+ 
  [[package]]
  name = "six"
  version = "1.17.0"
@@ -1527,7 +1692,7 @@ index ddc6bce..60787d7 100644
 -    { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050 },
 +    { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
  ]
-
+ 
  [[package]]
  name = "typing-extensions"
  version = "4.15.0"
@@ -1540,10 +1705,10 @@ index ddc6bce..60787d7 100644
  ]
 diff --git a/solver/cs260c_pilot.py b/solver/cs260c_pilot.py
 new file mode 100644
-index 0000000..ad20bab
+index 0000000..26504a8
 --- /dev/null
 +++ b/solver/cs260c_pilot.py
-@@ -0,0 +1,263 @@
+@@ -0,0 +1,297 @@
 +"""CS 260C perception-guided racing pilot for the Elodin harness.
 +
 +This solver deliberately ignores Elodin's world pose. It consumes only the FPV
@@ -1555,6 +1720,7 @@ index 0000000..ad20bab
 +
 +import atexit
 +import csv
++import math
 +import os
 +import sys
 +from pathlib import Path
@@ -1568,9 +1734,16 @@ index 0000000..ad20bab
 +if str(PROJECT_ROOT) not in sys.path:
 +    sys.path.insert(0, str(PROJECT_ROOT))
 +
-+from algorithm import AutonomousRacingPilot, VehicleTelemetry  # noqa: E402
++from algorithm import (  # noqa: E402
++    AutonomousRacingPilot,
++    VehicleTelemetry,
++    build_gate_tracker,
++    detector_config_from_env,
++    get_camera_profile,
++)
 +from algorithm.control_adapter import to_betaflight_rc_fields  # noqa: E402
 +from algorithm.frames import body_forward_elevation_from_quat_xyzw  # noqa: E402
++from algorithm.reactive_controller import ReactiveControllerGains, ReactiveGateController  # noqa: E402
 +
 +
 +T_DISARMED_END = 0.50
@@ -1579,7 +1752,33 @@ index 0000000..ad20bab
 +
 +TAKEOFF_THROTTLE = 1300
 +
-+_pilot = AutonomousRacingPilot(frame_format="rgb")
++def _build_pilot() -> AutonomousRacingPilot:
++    profile = get_camera_profile()
++    detector_config = detector_config_from_env(camera_profile=profile.name)
++    tracker = build_gate_tracker(detector_config)
++    controller = ReactiveGateController(
++        ReactiveControllerGains(
++            camera_tilt_up_rad=math.radians(profile.tilt_up_deg),
++        )
++    )
++    print(
++        "[CS260C] camera profile: "
++        f"{profile.name} lens={profile.lens_model} "
++        f"fx={profile.fx:.2f} fy={profile.fy:.2f} "
++        f"fov_v={profile.fov_vert_deg:.1f}deg fov_h={profile.fov_horiz_deg:.1f}deg"
++    )
++    print(
++        "[CS260C] detector backend: "
++        f"{detector_config.kind} ({type(tracker.detector).__name__})"
++    )
++    return AutonomousRacingPilot(
++        tracker=tracker,
++        controller=controller,
++        frame_format="rgb",
++    )
++
++
++_pilot = _build_pilot()
 +_last_tick = -1
 +_trace_file = None
 +_trace_writer = None

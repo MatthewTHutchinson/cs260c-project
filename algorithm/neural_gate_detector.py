@@ -8,7 +8,7 @@ PyTorch/TensorFlow dependency to the default VQ1 baseline.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -24,6 +24,7 @@ except ImportError:
 
 
 NeuralOutputFormat = Literal["corners8", "bbox", "center_distance", "heatmap"]
+NeuralPixelOutputSpace = Literal["input", "frame"]
 
 
 @dataclass(frozen=True)
@@ -37,11 +38,13 @@ class NeuralGateDetectorConfig:
     scale: float = 1.0 / 255.0
     swap_rb: bool = True
     normalized_output: bool = True
+    pixel_output_space: NeuralPixelOutputSpace = "input"
     gate_physical_width_m: float = 2.7
     min_confidence: float = 0.35
     mask_threshold: float = 0.5
     min_mask_area_px: float = 40.0
     max_forward_output_rows: int = 256
+    source_name: str = "neural"
 
 
 class OpenCVDNNGateDetector:
@@ -116,7 +119,10 @@ class OpenCVDNNGateDetector:
         if arr.ndim == 2:
             return arr
         if arr.ndim == 3 and arr.shape[0] == 1:
-            return arr[0]
+            rows = arr[0]
+            if rows.shape[0] <= 16 and rows.shape[1] > rows.shape[0]:
+                return rows.T
+            return rows
         if arr.ndim == 4 and arr.shape[0] == 1 and arr.shape[1] == 1:
             return arr.reshape(arr.shape[2], arr.shape[3])
         raise ValueError(f"Unsupported neural detector output shape: {arr.shape}")
@@ -162,7 +168,7 @@ class OpenCVDNNGateDetector:
                 distance_est=distance_m,
                 confidence=confidence,
                 pixel_centre=(float(cx), float(cy)),
-                source="neural",
+                source=self.config.source_name,
             )
 
         raise ValueError(f"Unsupported neural detector output format: {fmt}")
@@ -230,13 +236,16 @@ class OpenCVDNNGateDetector:
             confidence=float(np.clip(confidence, 0.0, 1.0)),
             pixel_centre=(float(cx), float(cy)),
             corners_px=corners_px,
-            source="neural",
+            source=self.config.source_name,
         )
 
     def _scale_point(self, point: np.ndarray, cam: CameraParams) -> tuple[float, float]:
         x, y = point.astype(float)
         if self.config.normalized_output:
             return float(x * cam.width), float(y * cam.height)
+        if self.config.pixel_output_space == "input":
+            input_w, input_h = self.config.input_size
+            return float(x * cam.width / input_w), float(y * cam.height / input_h)
         return float(x), float(y)
 
     def _scale_points(self, points: np.ndarray, cam: CameraParams) -> np.ndarray:
@@ -244,6 +253,10 @@ class OpenCVDNNGateDetector:
         if self.config.normalized_output:
             pts[:, 0] *= cam.width
             pts[:, 1] *= cam.height
+        elif self.config.pixel_output_space == "input":
+            input_w, input_h = self.config.input_size
+            pts[:, 0] *= cam.width / input_w
+            pts[:, 1] *= cam.height / input_h
         return pts
 
     def _scale_box(self, box: np.ndarray, cam: CameraParams) -> tuple[float, float, float, float]:
@@ -255,4 +268,24 @@ class OpenCVDNNGateDetector:
                 float(width * cam.width),
                 float(height * cam.height),
             )
+        if self.config.pixel_output_space == "input":
+            input_w, input_h = self.config.input_size
+            return (
+                float(cx * cam.width / input_w),
+                float(cy * cam.height / input_h),
+                float(width * cam.width / input_w),
+                float(height * cam.height / input_h),
+            )
         return float(cx), float(cy), float(width), float(height)
+
+
+class GateNetONNXDetector(OpenCVDNNGateDetector):
+    """Named wrapper for a GateNet-style model exported to ONNX.
+
+    GateNet forks/exports can use different output heads. Keep the same
+    `NeuralGateDetectorConfig.output_format` switch as the generic ONNX
+    backend, but label observations as `gatenet` in debug traces.
+    """
+
+    def __init__(self, config: NeuralGateDetectorConfig) -> None:
+        super().__init__(replace(config, source_name="gatenet"))

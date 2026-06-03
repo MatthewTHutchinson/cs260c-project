@@ -23,23 +23,45 @@ image measurement to body-rate/thrust command.
 
 ## Implemented Hook
 
-`algorithm/neural_gate_detector.py` adds an optional OpenCV-DNN/ONNX backend:
+The active hook now has two parts:
+
+- `algorithm/neural_gate_detector.py`: OpenCV-DNN/ONNX inference adapter,
+  including a named `GateNetONNXDetector` wrapper.
+- `algorithm/detector_factory.py`: runtime selection for `classical`,
+  `onnx`, or `gatenet` detectors.
+
+Direct construction:
 
 ```python
 from algorithm.gate_tracker import GateTracker
 from algorithm.neural_gate_detector import (
+    GateNetONNXDetector,
     NeuralGateDetectorConfig,
-    OpenCVDNNGateDetector,
 )
 
-detector = OpenCVDNNGateDetector(
+detector = GateNetONNXDetector(
     NeuralGateDetectorConfig(
-        model_path="models/gate_detector.onnx",
+        model_path="models/gatenet.onnx",
         output_format="corners8",
     )
 )
 tracker = GateTracker(detector=detector)
 ```
+
+Runtime selection:
+
+```bash
+CS260C_GATE_DETECTOR=gatenet \
+CS260C_GATE_DETECTOR_MODEL=models/gatenet.onnx \
+CS260C_GATE_DETECTOR_OUTPUT=corners8 \
+scripts/inspect_gate_frames.py \
+  --source logs/elodin_fpv_frames \
+  --out-dir logs/gatenet_inspection_elodin
+```
+
+The same environment variables also affect `AutonomousRacingPilot` when no
+custom tracker is injected, which lets the Elodin solver swap detectors without
+changing solver code.
 
 Supported output layouts:
 
@@ -47,6 +69,14 @@ Supported output layouts:
 - `bbox`: YOLO-style center, width, height, and confidence/class scores
 - `center_distance`: gate center, distance, and confidence
 - `heatmap`: segmentation/confidence map for FCN/U-Net style models
+
+Coordinate convention:
+
+- normalized outputs are interpreted in `[0, 1]` image coordinates
+- non-normalized outputs default to detector-input pixels and are scaled back
+  to the active camera frame
+- set `CS260C_GATE_DETECTOR_PIXEL_SPACE=frame` only if the exported model
+  already reports full-frame pixel coordinates
 
 The backend returns the same `GateObservation` object as the HSV detector, so
 the tracker/controller do not change.
@@ -57,7 +87,7 @@ the tracker/controller do not change.
 |---|---|---|---|
 | PencilNet | Code, datasets, and linked trained models for gate center, distance, and orientation | Best near-term candidate if we can download/convert a model | TensorFlow/ROS-oriented, trained on its gate/camera domain |
 | MonoRaceGate | 2026 drone racing dataset with precise inner-corner labels | Excellent data source for training/fine-tuning a corner detector | Dataset, not a ready inference model |
-| GateNet | Shallow gate perception network for wide-FOV fisheye camera | Useful research baseline | Repo is sparse and fisheye-specific; no clean release |
+| GateNet | Shallow gate perception network for wide-FOV fisheye camera | Adapter-ready through `GateNetONNXDetector` | Requires a compatible ONNX export/weights and may need fisheye-to-pinhole care |
 | AlphaPilot-style corner detector | Strong architecture: corner confidence maps plus part affinity fields | Best long-term multi-gate geometry idea | Public challenge repos are old and not a clean pretrained package |
 | FCN/U-Net gate segmentation | Direct mask/corner signal that can feed PnP/range | Good if weights or quick training data are available | Needs VQ1/Elodin labels or compatible public weights |
 | Viola-Jones cascade | Lightweight historical detector | Low priority | Too brittle for lighting, pose, partial gates, and multiple gates |
@@ -104,3 +134,10 @@ For any neural detector candidate:
 
 Success means the detector improves candidate stability without requiring
 world pose, simulator gate IDs, GPS, depth, or pre-known gate coordinates.
+
+GateNet status as of 2026-06-03:
+
+- integrated as a named ONNX runtime backend
+- not used in the reported Elodin flight results yet
+- no GateNet weights are checked into this repo
+- first proof should be detector-only overlays, not a live flight claim
