@@ -112,14 +112,14 @@ RacingCommand(roll_rate, pitch_rate, yaw_rate, thrust)
 
 Adapters map that command to the runtime:
 
-- Elodin/Betaflight: RC PWM fields
+- local simulator: RC PWM fields
 - VQ1/MAVSDK: attitude-rate/thrust fields
 
 This keeps perception/control logic independent from simulator-specific packet formats.
 
 ## Slide 7: Local Validation Harness
 
-Because official VQ1 access requires Windows and is not yet available locally, validation uses the Elodin AI Grand Prix practice harness.
+Because official VQ1 access requires Windows and is not yet available locally, validation uses a local drone-racing simulation environment.
 
 What it gives us:
 
@@ -131,7 +131,7 @@ What it gives us:
 
 Important caveat:
 
-Elodin exposes world pose, but the CS260C pilot does not pass world pose into `AutonomousRacingPilot`.
+The local simulator exposes debug state, but the CS260C pilot does not pass world pose into `AutonomousRacingPilot`.
 
 ## Slide 8: Current Results
 
@@ -139,33 +139,31 @@ Current verified results:
 
 - active algorithm package compiles
 - synthetic gate overlay produces a valid detection and control command
-- no-FPV Elodin Betaflight smoke test succeeds
-- CS260C Elodin solver adapter succeeds in the same smoke test
+- no-FPV simulation smoke test succeeds
+- CS260C simulator adapter succeeds in the same smoke test
 - optional pilot CSV trace logs mode, confidence, bearings, command, and RC output
 
-Commands:
+Evidence artifacts:
 
-```bash
-scripts/inspect_gate_frames.py --demo --out-dir logs/gate_inspection_demo --save-mask
-scripts/run_elodin_smoke.sh
-RACE_SOLVER=solver.cs260c_pilot scripts/run_elodin_smoke.sh
-scripts/run_elodin_editor.sh
-```
+- detector overlay images
+- pilot trace CSV
+- local simulation smoke-test logs
+- simulation FPV inspection frames
 
 ## Slide 9: Limitations
 
 Current limitations:
 
-- HSV detector is provisional until real VQ1/Elodin FPV frames are tuned
+- HSV detector is provisional until real VQ1/local-simulation FPV frames are tuned
 - no finished VQ1 Windows runtime yet
-- Elodin command path uses Betaflight RC, while official VQ1 likely needs MAVSDK/MAVLink
+- local simulation command path uses RC fields, while official VQ1 likely needs MAVSDK/MAVLink
 - current planner is completion-first, not a time-optimal racing-line planner
 
 ## Slide 10: Next Steps
 
 Immediate next steps:
 
-1. Collect real Elodin FPV frames.
+1. Collect real local-simulation FPV frames.
 2. Tune the detector and save overlays.
 3. Add a small labeled frame set.
 4. Implement VQ1 MAVSDK adapter when simulator credentials arrive.

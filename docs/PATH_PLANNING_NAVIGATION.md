@@ -235,7 +235,7 @@ center alone.
 3. Implement reactive guidance law.
 4. Implement commit/pass/reacquire logic.
 5. Build playback tests from logged VQ1 frames as soon as available.
-6. Validate finite racecourse semantics in Elodin and later VQ1.
+6. Validate finite racecourse semantics in the local simulator and later VQ1.
 7. Add evaluation metrics for gate order, finish, search time, and detection loss.
 8. Replace the visual proxy with an explicit navigation state machine once VQ1
    frames confirm gate appearance and candidate ambiguity.

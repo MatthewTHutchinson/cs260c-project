@@ -55,13 +55,13 @@ CS260C_GATE_DETECTOR=gatenet \
 CS260C_GATE_DETECTOR_MODEL=models/gatenet.onnx \
 CS260C_GATE_DETECTOR_OUTPUT=corners8 \
 scripts/inspect_gate_frames.py \
-  --source logs/elodin_fpv_frames \
-  --out-dir logs/gatenet_inspection_elodin
+  --source path/to/fpv_frames \
+  --out-dir logs/gatenet_inspection_sim
 ```
 
 The same environment variables also affect `AutonomousRacingPilot` when no
-custom tracker is injected, which lets the Elodin solver swap detectors without
-changing solver code.
+custom tracker is injected, which lets the local simulation solver swap
+detectors without changing solver code.
 
 Supported output layouts:
 
@@ -89,7 +89,7 @@ the tracker/controller do not change.
 | MonoRaceGate | 2026 drone racing dataset with precise inner-corner labels | Excellent data source for training/fine-tuning a corner detector | Dataset, not a ready inference model |
 | GateNet | Shallow gate perception network for wide-FOV fisheye camera | Adapter-ready through `GateNetONNXDetector` | Requires a compatible ONNX export/weights and may need fisheye-to-pinhole care |
 | AlphaPilot-style corner detector | Strong architecture: corner confidence maps plus part affinity fields | Best long-term multi-gate geometry idea | Public challenge repos are old and not a clean pretrained package |
-| FCN/U-Net gate segmentation | Direct mask/corner signal that can feed PnP/range | Good if weights or quick training data are available | Needs VQ1/Elodin labels or compatible public weights |
+| FCN/U-Net gate segmentation | Direct mask/corner signal that can feed PnP/range | Good if weights or quick training data are available | Needs VQ1/local-simulation labels or compatible public weights |
 | Viola-Jones cascade | Lightweight historical detector | Low priority | Too brittle for lighting, pose, partial gates, and multiple gates |
 
 Sources:
@@ -122,7 +122,7 @@ So the next high-value work is:
 For any neural detector candidate:
 
 1. Export or wrap the model so it outputs one of the supported layouts.
-2. Run it offline on `logs/elodin_fpv_frames`.
+2. Run it offline on saved local-simulation FPV frames.
 3. Save overlays with predicted corners/boxes/masks.
 4. Compare detector-only metrics against the HSV baseline:
    - visible-gate recall
@@ -130,7 +130,7 @@ For any neural detector candidate:
    - center jitter
    - range/apparent-size stability
    - runtime per frame
-5. Use the same Elodin course suite with only the detector swapped.
+5. Use the same local simulation course suite with only the detector swapped.
 
 Success means the detector improves candidate stability without requiring
 world pose, simulator gate IDs, GPS, depth, or pre-known gate coordinates.
@@ -141,7 +141,7 @@ GateNet status as of 2026-06-03:
   `c279bdf8d4e85e40979bbffca783cd4086df5388`
 - details recorded in `docs/reference/gatenet_external.md`
 - integrated as a named ONNX runtime backend
-- not used in the reported Elodin flight results yet
+- not used in the reported local simulation flight results yet
 - no GateNet weights are checked into this repo
 - first proof should be detector-only overlays, not a live flight claim
 

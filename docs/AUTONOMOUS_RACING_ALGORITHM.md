@@ -32,7 +32,7 @@ It outputs:
 - yaw rate
 - normalized collective thrust
 
-That output is the internal command boundary. Deployment maps it to MAVSDK `SET_ATTITUDE_TARGET` / attitude-rate style commands. The local Elodin harness maps the same command to Betaflight-style RC packet fields.
+That output is the internal command boundary. Deployment maps it to MAVSDK `SET_ATTITUDE_TARGET` / attitude-rate style commands. The local simulation environment maps the same command to Betaflight-style RC packet fields.
 
 ## Why This Algorithm
 
@@ -69,14 +69,14 @@ Simulator / VQ1 runtime
   -> ReactiveGateController
   -> RacingCommand
   -> backend adapter
-      -> Elodin Betaflight RC today
+      -> local simulator RC today
       -> MAVSDK attitude-rate/thrust for VQ1
 ```
 
 Boundaries:
 
 - `algorithm/` is the competition-facing autonomy package.
-- `solver/cs260c_pilot.py` in the sibling Elodin harness is only an adapter.
+- `solver/cs260c_pilot.py` in the sibling simulation harness is only an adapter.
 - `patches/elodin-ai-grand-prix-cs260c.patch` records the sibling harness
   changes needed to reproduce local validation.
 - world position and simulator gate IDs are never passed into
@@ -102,7 +102,7 @@ The first detector is deliberately classical:
 
 Current CV implementation:
 
-- `algorithm/gate_detector.py`: HSV masks for the observed Elodin gate colors
+- `algorithm/gate_detector.py`: HSV masks for the observed local-simulator gate colors
   plus the original orange/yellow demo color, contour extraction, candidate
   scoring, bearing, and rough range.
 - `algorithm/neural_gate_detector.py`: optional OpenCV-DNN/ONNX backend for
@@ -159,7 +159,7 @@ pitch_rate = forward approach command from gate range/size/confidence
 ```
 
 This is still the major weakness in the current stack. A bounded gain-shaping
-experiment was less stable in live Elodin flight, so the next controller
+experiment was less stable in live simulation, so the next controller
 upgrade should be a real guidance/planning layer with lookahead rather than a
 cosmetic change to the proportional visual-servo law.
 
@@ -201,25 +201,25 @@ algorithm/autopilot.py
 algorithm/control_adapter.py
 ```
 
-## Elodin Caveats And Workarounds
+## Local Simulator Caveats And Workarounds
 
-The Elodin practice harness is useful, but it is not a drop-in competition simulator.
+The local practice harness is useful, but it is not a drop-in competition simulator.
 
 ### Betaflight UDP Instead Of MAVLink
 
 This is a real deployment caveat, but it is manageable.
 
-It matters because the official spec is MAVLink 2 through MAVSDK-compatible UDP, while Elodin's solver talks to a Betaflight SITL bridge. Code written directly around Elodin packet structures will not deploy unchanged.
+It matters because the official spec is MAVLink 2 through MAVSDK-compatible UDP, while the local solver talks to a Betaflight SITL bridge. Code written directly around local simulator packet structures will not deploy unchanged.
 
 The workaround is the internal `RacingCommand` boundary:
 
 ```text
 algorithm output: RacingCommand(roll_rate, pitch_rate, yaw_rate, thrust)
-  -> Elodin adapter: Betaflight RC command
+  -> local simulator adapter: Betaflight-style RC command
   -> official adapter: MAVSDK attitude-rate/thrust command
 ```
 
-So Elodin can test perception, timing, and qualitative control behavior, but the official MAVSDK adapter still has to be written and probed in VQ1.
+So the local simulator can test perception, timing, and qualitative control behavior, but the official MAVSDK adapter still has to be written and probed in VQ1.
 
 ### ENU World State Instead Of NED
 
@@ -243,11 +243,11 @@ The workaround is simple and strict:
 - use world pose only for offline scoring/debug plots
 - mark any experiment that uses world pose as privileged and non-competition-facing
 
-If we follow that boundary, Elodin's extra pose field stops being a contamination problem.
+If we follow that boundary, the simulator's extra pose field stops being a contamination problem.
 
 ## Simulator Direction
 
-Elodin is now the primary local harness while Windows/VQ1 access is unavailable.
+The local simulation environment is now the primary harness while Windows/VQ1 access is unavailable.
 
 PyBullet is preserved only as legacy work under:
 
@@ -257,11 +257,11 @@ legacy/pybullet/
 
 That old stack can still provide historical context, but it should not drive the final-project claims. The main harness work is now:
 
-- use the stable no-FPV Elodin smoke path for Betaflight/control checks
-- use `elodin editor` separately for FPV/render inspection
-- keep `AutonomousRacingPilot` connected to Elodin `SensorUpdate` without world pose
-- map `RacingCommand` to Elodin `RCCommand`
-- verify detector behavior on Elodin FPV frames
+- use the stable no-FPV simulation smoke path for Betaflight/control checks
+- use the interactive simulator path separately for FPV/render inspection
+- keep `AutonomousRacingPilot` connected to the simulator telemetry adapter without world pose
+- map `RacingCommand` to simulator RC command fields
+- verify detector behavior on local-simulation FPV frames
 - keep official VQ1/MAVSDK as the deployment target when Windows access arrives
 
 ## Four-Day Final Presentation Story
@@ -272,7 +272,7 @@ The final project should present the algorithm cleanly:
 2. Perception: classical gate detector and temporal tracker.
 3. Navigation: search/track/commit state machine.
 4. Control: body-rate/thrust visual servoing.
-5. Adaptation: same internal command mapped to Elodin now and MAVSDK in VQ1.
-6. Evaluation: Elodin harness behavior, detection stability, command traces, and caveat analysis.
+5. Adaptation: same internal command mapped to the local simulator now and MAVSDK in VQ1.
+6. Evaluation: local simulation behavior, detection stability, command traces, and caveat analysis.
 
 The architecture reset is background context, not the headline.

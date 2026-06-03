@@ -36,7 +36,7 @@ Read these in order:
 4. `docs/COMPETITION_CONTEXT.md`
 5. `docs/VQ1_ACCESS_RUNBOOK.md`
 
-## Elodin Harness
+## Local Simulation Harness
 
 The local practice harness lives outside this repo:
 
@@ -46,13 +46,13 @@ The local practice harness lives outside this repo:
 
 Current status:
 
-- Elodin CLI installed.
-- Elodin DB CLI installed.
+- simulator CLI installed.
+- simulator DB CLI installed.
 - `uv sync` completed.
-- Elodin tests passed.
+- simulator tests passed.
 - Betaflight SITL built.
 - The no-FPV Betaflight/control smoke path is reliable through the local wrapper.
-- The CS260C solver adapter has been smoke-tested in Elodin without consuming world pose.
+- The CS260C solver adapter has been smoke-tested in the local simulator without consuming world pose.
 
 No-FPV smoke wrapper:
 
@@ -94,8 +94,8 @@ CS260C_GATE_DETECTOR=gatenet \
 CS260C_GATE_DETECTOR_MODEL=models/gatenet.onnx \
 CS260C_GATE_DETECTOR_OUTPUT=corners8 \
 scripts/inspect_gate_frames.py \
-  --source logs/elodin_fpv_frames \
-  --out-dir logs/gatenet_inspection_elodin
+  --source path/to/fpv_frames \
+  --out-dir logs/gatenet_inspection_sim
 ```
 
 The repo does not include GateNet weights. Treat this as an adapter path until
@@ -132,6 +132,6 @@ Validate active code:
 
 ## Project Rule
 
-Do not mix new VQ1/Elodin work into `legacy/pybullet/`.
+Do not mix new VQ1/local-simulation work into `legacy/pybullet/`.
 
 Do not present old PyBullet track results as the final algorithm. The final project should present the current autonomous racing algorithm and use PyBullet only as historical context for why the simulator strategy changed.

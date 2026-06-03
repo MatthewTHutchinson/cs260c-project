@@ -134,13 +134,13 @@ gate image error -> local velocity/yaw command -> control adapter
 
 This gives us a working completion candidate and a debugging tool for every later learned policy.
 
-### Priority 4: Elodin Harness
+### Priority 4: Local Simulation Harness
 
-Use Elodin as the primary local harness while Windows/VQ1 access is unavailable:
+Use the local simulation environment as the primary harness while Windows/VQ1 access is unavailable:
 
 - use the stable no-FPV Mac smoke path for Betaflight/control checks
 - keep the stock harness as a known baseline
-- use the `AutonomousRacingPilot` Elodin solver adapter
+- use the `AutonomousRacingPilot` simulator adapter
 - use the interactive editor path for FPV detector tuning
 - quarantine world pose from the algorithm
 - export run telemetry/video for presentation evidence
@@ -180,5 +180,5 @@ Candidate learning uses:
 7. Keep body-velocity/yaw-rate as the fallback probe.
 8. Use `scripts/run_elodin_smoke.sh` as the repeatable no-FPV control check.
 9. Run `RACE_SOLVER=solver.cs260c_pilot scripts/run_elodin_smoke.sh` after controller changes.
-10. Tune the detector on Elodin FPV frames through `elodin editor sim/main.py`.
+10. Tune the detector on local-simulation FPV frames through the interactive simulator.
 11. Build the reactive completion baseline around search, track, commit, and reacquire.

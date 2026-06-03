@@ -2,7 +2,7 @@
 
 Date: 2026-05-31
 
-The repo is organized to keep the new VQ1/Elodin-facing project separate from the old PyBullet training stack.
+The repo is organized to keep the new VQ1/local-simulation-facing project separate from the old PyBullet training stack.
 
 ## Active Project
 
@@ -28,7 +28,7 @@ external/
 
 `assets/presentation/` contains current final-presentation figures and overlays.
 
-`scripts/` contains current operational scripts for the Elodin/VQ1 path.
+`scripts/` contains current operational scripts for the local-simulation/VQ1 path.
 
 `external/` contains ignored local research checkouts. These are reference
 repos, not active runtime packages.
@@ -41,7 +41,7 @@ Use this for external facts and captured source material:
 docs/reference/
 ```
 
-This includes the current technical spec, MAVLink schema, papers, and captured Elodin/VQ1 reference notes.
+This includes the current technical spec, MAVLink schema, papers, and captured simulator/VQ1 reference notes.
 
 `docs/reference/gatenet_external.md` records the local GateNet clone, upstream
 commit, and practical integration caveats.
@@ -56,11 +56,11 @@ legacy/pybullet/
 
 It includes the old configs, tracks, PyBullet environment, training scripts, learned-policy code, evaluation tools, and presentation assets.
 
-Do not add new VQ1/Elodin work there. Only touch it when intentionally inspecting or citing the historical work.
+Do not add new VQ1/local-simulation work there. Only touch it when intentionally inspecting or citing the historical work.
 
 ## External Harness
 
-The Elodin practice harness is a sibling repo, not vendored into this project:
+The local practice harness is a sibling repo, not vendored into this project:
 
 ```text
 /Users/matthewhutchinson/dev/elodin-ai-grand-prix
@@ -76,7 +76,7 @@ If the work explains or supports the final project, put it in `docs/`.
 
 If the work is a current final-presentation visual, put it in `assets/presentation/`.
 
-If the work runs the local Elodin/VQ1 workflow, put it in `scripts/`.
+If the work runs the local simulation/VQ1 workflow, put it in `scripts/`.
 
 If the work is an upstream research checkout, keep it under `external/` and
 document the integration path in `docs/reference/`.

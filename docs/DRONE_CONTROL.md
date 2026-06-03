@@ -239,7 +239,7 @@ All sign conventions must be tested with small commands:
 
 ## Local Harness Control Reset
 
-The old body-frame waypoint action is no longer the main research target. The active local harness is Elodin, with the PyBullet stack preserved under `legacy/pybullet/`.
+The old body-frame waypoint action is no longer the main research target. The active local harness is the current simulation environment, with the PyBullet stack preserved under `legacy/pybullet/`.
 
 New harness work should add a control path that better matches the internal command interface:
 
@@ -262,6 +262,6 @@ Then compare:
 4. Record command response logs.
 5. Compare attitude-rate/thrust against body-velocity/yaw-rate.
 6. Choose the first real control adapter.
-7. Mirror that adapter in Elodin.
+7. Mirror that adapter in the local simulator.
 8. Implement the reactive gate-centering baseline.
 9. Only then consider learned control policies.

@@ -10,7 +10,7 @@ FPV frame
   -> distance-aware temporal gate tracker
   -> reactive visual-servo controller
   -> body-rate/thrust command
-  -> Elodin Betaflight RC adapter
+  -> local simulator RC adapter
 ```
 
 This is a completion-first baseline. It does not use GPS, world pose, simulator
@@ -18,7 +18,7 @@ gate IDs, pre-known gate coordinates, depth, RL, MPC, or a learned CV model.
 The codebase now has a GateNet/ONNX detector adapter, but the results below
 were produced by the classical detector.
 
-## Local Elodin Validation
+## Local Simulation Validation
 
 | Course | Shape | Result | Pass Times | Interpretation |
 |---|---:|---:|---|---|
@@ -29,19 +29,9 @@ were produced by the classical detector.
 | `circular` / `circular_arc` | 4 yawed gates on a gentle arc | `2/4 DNF` | `5.49, 6.81, --, --` | flies wide after gate 1 without lookahead |
 | `s_curve` | 5 yawed gates with linked lateral wiggles | `1/5 DNF` | `4.95, --, --, --, --` | misses first lateral wiggle |
 
-Logs:
-
-```text
-logs/elodin_course_suite/summary.csv
-logs/elodin_course_suite_search_brake/summary.csv
-logs/elodin_course_suite_lateral_rerun/summary.csv
-logs/elodin_challenge_suite_single/summary.csv
-logs/elodin_hard_track_results/summary.csv
-logs/elodin_camera_profile_suite/summary.csv
-logs/elodin_camera_profile_four_gate_rerun/summary.csv
-assets/presentation/circular_arc_trace.png
-assets/presentation/s_curve_trace.png
-```
+Run artifacts are saved under `logs/`, with presentation-ready trace plots in
+`assets/presentation/circular_arc_trace.png` and
+`assets/presentation/s_curve_trace.png`.
 
 ## Camera Profile A/B
 
@@ -49,13 +39,13 @@ The current harness can compare camera assumptions without replacing the
 autonomy stack:
 
 ```text
-ELODIN_CAMERA_PROFILE=vq1_pinhole
-ELODIN_CAMERA_PROFILE=gatenet_fisheye
+camera_profile=vq1_pinhole
+camera_profile=gatenet_fisheye
 ```
 
 The `gatenet_fisheye` profile uses a `120 deg` vertical FOV, `144 deg`
-horizontal FOV, and Elodin's `fisheye` render effect. The detector/controller
-use an effective focal length of `103.92 px` for bearing/range approximation.
+horizontal FOV, and a fisheye render effect. The detector/controller use an
+effective focal length of `103.92 px` for bearing/range approximation.
 
 | Camera Profile | Course | Result | Pass Times | Interpretation |
 |---|---|---:|---|---|

@@ -40,7 +40,7 @@ On-slide:
 - Detect the next gate in image space
 - Track short dropouts over time
 - Convert bearing and range into body-rate/thrust
-- Adapt the same command to Elodin now and MAVSDK later
+- Adapt the same command to the local simulator now and MAVSDK later
 
 Visual:
 
@@ -152,7 +152,7 @@ Title: `Simulator-specific packets are isolated behind one command interface.`
 On-slide:
 
 - Internal: `RacingCommand`
-- Elodin: Betaflight RC PWM fields
+- Local simulator: Betaflight-style RC PWM fields
 - VQ1 target: MAVSDK attitude-rate/thrust fields
 - World pose is never passed into the algorithm
 
@@ -166,17 +166,17 @@ RacingCommand
 
 Speaker note:
 
-This is the workaround for the Elodin caveats. Elodin uses Betaflight UDP and exposes world pose, while VQ1 uses MAVSDK-compatible MAVLink and no global position. The algorithm boundary keeps those concerns from contaminating perception and control.
+This is the workaround for simulator-specific caveats. The local simulation environment uses a Betaflight-style RC path and exposes extra debug state, while VQ1 uses MAVSDK-compatible MAVLink and no global position. The algorithm boundary keeps those concerns from contaminating perception and control.
 
 ## Slide 8: Local Validation Harness
 
 Kicker: `VALIDATION`
 
-Title: `Elodin gives us a better local harness while official VQ1 access is pending.`
+Title: `A local simulation environment lets us validate before official VQ1 access.`
 
 On-slide:
 
-- macOS-compatible practice harness
+- macOS-compatible simulation harness
 - Real Betaflight SITL in the loop
 - FPV editor path for visual inspection
 - No-FPV smoke path for reliable control checks
@@ -185,12 +185,12 @@ On-slide:
 Visual:
 
 ```text
-CS260C algorithm -> Elodin solver hook -> Betaflight SITL -> Elodin physics
+CS260C algorithm -> simulator adapter -> flight-controller SITL -> physics
 ```
 
 Speaker note:
 
-The old PyBullet work is now historical context. Elodin is not the official simulator, but it is higher quality for local debugging and matches the race-oriented workflow more closely.
+The old PyBullet work is now historical context. The current local simulator is not the official VQ1 environment, but it is higher quality for local debugging and matches the race-oriented workflow more closely.
 
 ## Slide 9: Current Evidence
 

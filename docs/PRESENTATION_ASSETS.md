@@ -36,6 +36,6 @@ They show:
 - the detector producing image-space gate measurements
 - the tracker switching from `detected` to `commit`, then `tracked`, then `search`
 - the controller reducing yaw/roll/pitch commands as the gate centers
-- the adapter mapping internal commands into RC-style fields for Elodin/Betaflight
+- the adapter mapping internal commands into local-simulator RC-style fields
 
-Replace or supplement these with Elodin/VQ1 frame assets as soon as real FPV captures are available.
+Replace or supplement these with local-simulation/VQ1 frame assets as soon as real FPV captures are available.
