@@ -70,6 +70,8 @@ optional learned-detector backend for the next perception upgrade:
 - `algorithm/gate_tracker.py`: confidence filtering, short-memory tracking,
   and `search` / `detected` / `tracked` / `commit` mode assignment.
 - `scripts/inspect_gate_frames.py`: offline overlays, masks, and trace output.
+- `external/gatenet/`: ignored upstream GateNet reference checkout. It is not
+  imported directly by the active runtime.
 
 The detector defaults should stay aligned with the latest known VQ camera model:
 `640 x 360`, intrinsics `[fx, fy, cx, cy] = [320, 320, 320, 180]`, and the
@@ -119,13 +121,13 @@ scripts/run_elodin_editor.sh
 scripts/run_elodin_course_suite.py --courses easy,lateral_soft,low_high,four_gate_straight
 ```
 
-Latest local validation, 2026-06-02:
+Latest local validation after distance-aware sequence selection, 2026-06-03:
 
 ```text
-easy: COMPLETE gates=3/3 lap_time=7.47
-lateral_soft: COMPLETE gates=3/3 lap_time=7.48
-low_high: COMPLETE gates=3/3 lap_time=7.42
-four_gate_straight: COMPLETE gates=4/4 lap_time=8.69
+easy: COMPLETE gates=3/3 lap_time=7.58
+lateral_soft: COMPLETE gates=3/3 lap_time=7.53
+low_high: COMPLETE gates=3/3 lap_time=7.41
+four_gate_straight: COMPLETE gates=4/4 lap_time=8.55
 ```
 
 ## Validation Commands
@@ -135,6 +137,7 @@ Use the project Conda Python:
 ```bash
 /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m py_compile algorithm/*.py scripts/*.py
 /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python scripts/audit_sign_conventions.py
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python scripts/audit_sequence_selection.py
 /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python scripts/audit_lateral_reacquisition.py
 scripts/run_elodin_course_suite.py --courses easy,lateral_soft,low_high,four_gate_straight
 ```

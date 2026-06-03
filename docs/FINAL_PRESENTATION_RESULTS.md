@@ -7,7 +7,7 @@ Date: 2026-06-03
 ```text
 FPV frame
   -> classical HSV/contour gate detector
-  -> temporal gate tracker
+  -> distance-aware temporal gate tracker
   -> reactive visual-servo controller
   -> body-rate/thrust command
   -> Elodin Betaflight RC adapter
@@ -22,10 +22,10 @@ were produced by the classical detector.
 
 | Course | Shape | Result | Pass Times | Interpretation |
 |---|---:|---:|---|---|
-| `easy` | 3 straight gates | `3/3 COMPLETE` | `4.90, 6.26, 7.47` | baseline completion works |
-| `lateral_soft` | 3 slight lateral-offset gates | `3/3 COMPLETE` | `4.88, 6.26, 7.48` | mild lateral correction works |
-| `low_high` | 3 height-varied gates | `3/3 COMPLETE` | `4.90, 6.25, 7.42` | camera pitch/sign handling works |
-| `four_gate_straight` | 4 straight gates | `4/4 COMPLETE` | `4.90, 6.31, 7.54, 8.69` | repeated reacquisition works |
+| `easy` | 3 straight gates | `3/3 COMPLETE` | `4.91, 6.33, 7.58` | baseline completion works |
+| `lateral_soft` | 3 slight lateral-offset gates | `3/3 COMPLETE` | `4.90, 6.29, 7.53` | mild lateral correction works |
+| `low_high` | 3 height-varied gates | `3/3 COMPLETE` | `4.88, 6.24, 7.41` | camera pitch/sign handling works |
+| `four_gate_straight` | 4 straight gates | `4/4 COMPLETE` | `4.89, 6.24, 7.45, 8.55` | repeated reacquisition works |
 | `circular_arc` | 4 yawed gates on a gentle arc | `2/4 DNF` | `5.54, 6.86, --, --` | cuts inside the curve after gate 1 |
 | `s_curve` | 5 yawed gates with linked lateral wiggles | `1/5 DNF` | `4.95, --, --, --, --` | misses first lateral wiggle |
 
@@ -74,14 +74,15 @@ and then an actual GateNet/ONNX detector.
 ## Takeaway
 
 The current stack is a strong transparent baseline for visible, mostly
-forward-progressing courses. It fails on curved and S-shaped courses because it
-has no explicit gate-sequence belief, no future-gate lookahead, and no
-trajectory planner. It sees the current largest/nearest gate-like contour and
-reacts locally.
+forward-progressing courses. It fails on curved and S-shaped courses because
+its sequence belief is still only a conservative visual proxy, with no
+future-gate lookahead and no trajectory planner. It sees the current
+largest/nearest gate-like contour, adds short post-pass stale-candidate
+rejection, and reacts locally.
 
 This is the right motivation for the next algorithm layer:
 
-- sequence-aware gate tracking
+- explicit navigation state and sequence belief
 - future-gate lookahead
 - stronger perception for partial/multiple gates
 - learned policy or MPC for dynamics-aware turning

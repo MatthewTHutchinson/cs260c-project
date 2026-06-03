@@ -39,6 +39,7 @@ class GateEstimate:
     confidence: float = 0.0
     pixel_center: Optional[tuple[float, float]] = None
     apparent_size_px: Optional[float] = None
+    sequence_index: int = 0
     age_s: float = 0.0
     mode: TrackMode = TrackMode.SEARCH
 

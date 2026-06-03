@@ -137,7 +137,30 @@ world pose, simulator gate IDs, GPS, depth, or pre-known gate coordinates.
 
 GateNet status as of 2026-06-03:
 
+- upstream cloned locally as `external/gatenet/` at commit
+  `c279bdf8d4e85e40979bbffca783cd4086df5388`
+- details recorded in `docs/reference/gatenet_external.md`
 - integrated as a named ONNX runtime backend
 - not used in the reported Elodin flight results yet
 - no GateNet weights are checked into this repo
 - first proof should be detector-only overlays, not a live flight claim
+
+The clone confirmed that GateNet is a good architectural match because its
+output includes gate center and distance. It is not yet a drop-in detector
+because the public repo does not include pretrained weights or an ONNX export.
+
+## Distance-Aware Sequencing
+
+GateNet-style distance estimates are useful for sequencing, but they do not
+identify gate order by themselves. The active tracker uses distance as one
+piece of visual evidence:
+
+- default to nearest/range-first candidate selection during ordinary approach
+- enter `commit` when the current gate is close
+- after a near commit, prefer a farther candidate over a very-close edge
+  candidate
+- briefly ignore close stale detections after a visual pass event
+- maintain an internal `sequence_index` for trace/debugging only
+
+This keeps the autonomy boundary legal: no simulator gate IDs, no global pose,
+and no pre-known gate coordinates enter the pilot.

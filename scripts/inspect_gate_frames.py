@@ -261,7 +261,7 @@ def draw_overlay(
     put_text(
         overlay,
         (
-            f"mode={gate.mode.value} conf={gate.confidence:.2f} "
+            f"seq={gate.sequence_index} mode={gate.mode.value} conf={gate.confidence:.2f} "
             f"bearing=({gate.bearing_h_rad:+.2f},{gate.bearing_v_rad:+.2f}) "
             f"dist={dist}"
         ),
@@ -302,6 +302,7 @@ def write_row(
             "frame_id": frame_id,
             "source": source_name,
             "timestamp_s": f"{timestamp_s:.6f}",
+            "sequence_index": gate.sequence_index,
             "mode": gate.mode.value,
             "confidence": f"{gate.confidence:.6f}",
             "bearing_h_rad": f"{gate.bearing_h_rad:.6f}",
@@ -469,6 +470,7 @@ def main() -> int:
         "frame_id",
         "source",
         "timestamp_s",
+        "sequence_index",
         "mode",
         "confidence",
         "bearing_h_rad",

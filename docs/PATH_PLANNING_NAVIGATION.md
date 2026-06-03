@@ -148,6 +148,23 @@ if commit_pass and elapsed_commit_time > threshold:
 
 Tune this with real VQ1 logs.
 
+The current implementation uses a visual proxy before adding a full navigation
+state machine:
+
+```text
+if near commit gate disappears:
+    advance visual sequence index
+    search/reacquire
+
+if near commit gate has a far candidate and a close edge candidate:
+    advance visual sequence index
+    track the far candidate
+    ignore close stale candidates briefly
+```
+
+The sequence index is a tracker/debug state, not simulator truth. It is derived
+from FPV detections and range estimates only.
+
 ## Search Behavior
 
 Search should be deliberate, not random.
@@ -200,3 +217,5 @@ Do not start here. VQ1 success is a reliable gate-order navigation problem first
 5. Build playback tests from logged VQ1 frames as soon as available.
 6. Validate finite racecourse semantics in Elodin and later VQ1.
 7. Add evaluation metrics for gate order, finish, search time, and detection loss.
+8. Replace the visual proxy with an explicit navigation state machine once VQ1
+   frames confirm gate appearance and candidate ambiguity.

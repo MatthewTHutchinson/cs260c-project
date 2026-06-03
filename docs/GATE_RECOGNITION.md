@@ -156,15 +156,39 @@ Maintain a short track state:
 - velocity in image coordinates
 - missed-frame count
 - confidence decay
-- candidate identity score
+- candidate range/edge gating
+- visual sequence index for trace/debugging
 
 Fallback behavior must be explicit:
 
 - `detected`: current frame has a valid gate candidate
 - `tracked`: no current detection, using short-term temporal prediction
 - `search`: no reliable gate; enter scan/search behavior
+- `commit`: current gate is near enough that clipped/edge detections should
+  not yank the target away from the intended pass-through line
 
 Do not silently fall back to simulator track truth.
+
+## Distance-Aware Candidate Selection
+
+The tracker now requests multiple detector candidates and uses range as a
+sequencing cue:
+
+```text
+current gate reaches commit range
+  -> detector sees a stale very-close edge candidate and a farther candidate
+  -> tracker advances its visual sequence counter
+  -> farther candidate becomes the next target
+```
+
+If the gate disappears immediately after a near commit, the tracker also treats
+that as a visual pass event and enters search/reacquire with the sequence
+counter advanced.
+
+This is not gate identity. It is a conservative FPV-only heuristic for avoiding
+the common failure where the detector reacquires the gate just passed because it
+is still large, close, and partially visible near the bottom or corner of the
+frame.
 
 ## Start and Finish Gates
 

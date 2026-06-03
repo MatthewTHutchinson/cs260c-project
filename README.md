@@ -23,6 +23,7 @@ It is preserved for reference, but it is not the active project direction.
 - `docs/`: current project docs, competition context, and final-project framing.
 - `scripts/`: current operational scripts.
 - `docs/reference/`: official specs, MAVLink schema, papers, and external reference captures.
+- `external/`: ignored local research checkouts such as GateNet.
 - `legacy/pybullet/`: old simulator, tracks, policies, configs, training code, and presentation assets.
 
 ## Start Here
@@ -93,6 +94,8 @@ scripts/inspect_gate_frames.py \
 
 The repo does not include GateNet weights. Treat this as an adapter path until
 an exported model is available and its overlays beat the classical baseline.
+The upstream reference clone lives at `external/gatenet/`; see
+`docs/reference/gatenet_external.md`.
 
 If direct script commands pick the wrong Python, use:
 
@@ -118,6 +121,7 @@ Validate active code:
 
 ```bash
 /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m py_compile algorithm/*.py
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python scripts/audit_sequence_selection.py
 ```
 
 ## Project Rule

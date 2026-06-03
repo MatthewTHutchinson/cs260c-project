@@ -13,6 +13,7 @@ algorithm/
 assets/presentation/
 docs/
 scripts/
+external/
 ```
 
 `algorithm/` contains the simulator-independent racing code:
@@ -29,6 +30,9 @@ scripts/
 
 `scripts/` contains current operational scripts for the Elodin/VQ1 path.
 
+`external/` contains ignored local research checkouts. These are reference
+repos, not active runtime packages.
+
 ## Reference
 
 Use this for external facts and captured source material:
@@ -38,6 +42,9 @@ docs/reference/
 ```
 
 This includes the current technical spec, MAVLink schema, papers, and captured Elodin/VQ1 reference notes.
+
+`docs/reference/gatenet_external.md` records the local GateNet clone, upstream
+commit, and practical integration caveats.
 
 ## Legacy
 
@@ -70,5 +77,8 @@ If the work explains or supports the final project, put it in `docs/`.
 If the work is a current final-presentation visual, put it in `assets/presentation/`.
 
 If the work runs the local Elodin/VQ1 workflow, put it in `scripts/`.
+
+If the work is an upstream research checkout, keep it under `external/` and
+document the integration path in `docs/reference/`.
 
 If the work is about old PyBullet policies, tracks, or training runs, put it in `legacy/pybullet/`.
