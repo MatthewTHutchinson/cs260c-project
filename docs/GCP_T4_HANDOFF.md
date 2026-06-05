@@ -266,6 +266,11 @@ python -m learning.train_bc \
   --epochs 40 \
   --batch-size 128 \
   --out checkpoints/feature_bc_privileged_teacher.pt
+
+python -m learning.eval_policy \
+  --checkpoint checkpoints/feature_bc_privileged_teacher.pt \
+  --traces logs/privileged_teacher/trace.csv \
+  --predictions-out logs/learning_smoke/feature_bc_privileged_teacher_predictions.csv
 ```
 
 Inspect the audit output before spending GPU time. The useful plots are the
@@ -273,6 +278,15 @@ curved tracks first: `circular_arc_teacher_audit.png` and
 `s_curve_teacher_audit.png`. Also check `command_saturation_pct`; some
 saturation on `s_curve` is acceptable, but saturation on easy/straight tracks is
 a red flag.
+
+Expected local baseline from a 20-epoch smoke run:
+
+```text
+overall mse=0.00043017
+easy mse=0.00003066
+circular_arc mse=0.00036189
+s_curve mse=0.00123746
+```
 
 ## 6. First Experiment
 

@@ -131,6 +131,15 @@ python -m learning.train_bc \
   --out checkpoints/feature_bc_privileged_teacher.pt
 ```
 
+Evaluate it with course and mode breakdowns:
+
+```bash
+python -m learning.eval_policy \
+  --checkpoint checkpoints/feature_bc_privileged_teacher.pt \
+  --traces logs/privileged_teacher/trace.csv \
+  --predictions-out logs/learning_smoke/feature_bc_privileged_teacher_predictions.csv
+```
+
 The loader prefers `teacher_*` target columns when they exist. It does not use
 `world_*` or `teacher_next_gate_*` columns as student inputs.
 
@@ -138,3 +147,15 @@ The current privileged teacher uses a smooth cubic Hermite reference through the
 gate centers and selects a future point on that reference as the lookahead
 target. It is intentionally a stepping stone toward minimum-snap/reference
 trajectory labels, not the deployed competition policy.
+
+Current local 20-epoch smoke result, 2026-06-05:
+
+```text
+overall mse=0.00043017
+easy mse=0.00003066
+circular_arc mse=0.00036189
+s_curve mse=0.00123746
+```
+
+The S-curve should remain the hardest course. If easy/straight errors are high,
+debug the learning plumbing before increasing model complexity.

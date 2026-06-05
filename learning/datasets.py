@@ -179,6 +179,7 @@ class TraceSequenceDataset(Dataset):
         trace_paths = discover_trace_paths(traces)
         xs: list[np.ndarray] = []
         ys: list[np.ndarray] = []
+        sample_rows: list[dict[str, str]] = []
         feature_names: tuple[str, ...] | None = None
         for trace in trace_paths:
             rows = read_trace_csv(trace)
@@ -190,12 +191,16 @@ class TraceSequenceDataset(Dataset):
                 end = start + self.sequence_length
                 xs.append(features[start:end])
                 ys.append(targets[end - 1])
+                sample_row = dict(rows[end - 1])
+                sample_row["_trace_path"] = str(trace)
+                sample_rows.append(sample_row)
 
         if not xs:
             raise ValueError("no sequence samples were created from the provided traces")
         self.x = torch.from_numpy(np.stack(xs).astype(np.float32))
         self.y = torch.from_numpy(np.stack(ys).astype(np.float32))
         self.feature_names = feature_names or FeatureSpec.default().feature_names
+        self.sample_rows = sample_rows
 
     @property
     def input_dim(self) -> int:

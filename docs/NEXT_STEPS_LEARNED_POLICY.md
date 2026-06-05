@@ -318,6 +318,11 @@ Use the T4 in short, staged jobs:
 Expected cloud use should stay modest if the first policy is feature-based
 instead of raw-image-based.
 
+Use `learning.eval_policy` for BC evaluation. It now reports overall,
+per-course, and per-mode errors, plus prediction-vs-target saturation
+percentages so curved-track failures are visible instead of hidden in aggregate
+MSE.
+
 ## Robustness Work
 
 Randomization should be added before trusting learned-policy results:
