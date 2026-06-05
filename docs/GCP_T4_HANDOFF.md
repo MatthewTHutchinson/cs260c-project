@@ -256,12 +256,21 @@ Generate and train on the first privileged-teacher debug dataset:
 python scripts/generate_privileged_teacher_dataset.py \
   --out logs/privileged_teacher/trace.csv
 
+python scripts/audit_privileged_teacher_dataset.py \
+  --trace logs/privileged_teacher/trace.csv \
+  --plot \
+  --out-dir logs/privileged_teacher/audit
+
 python -m learning.train_bc \
   --traces logs/privileged_teacher/trace.csv \
   --epochs 40 \
   --batch-size 128 \
   --out checkpoints/feature_bc_privileged_teacher.pt
 ```
+
+Inspect the audit output before spending GPU time. The useful plots are the
+curved tracks first: `circular_arc_teacher_audit.png` and
+`s_curve_teacher_audit.png`.
 
 ## 6. First Experiment
 

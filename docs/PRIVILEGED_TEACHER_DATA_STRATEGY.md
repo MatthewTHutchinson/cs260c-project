@@ -70,11 +70,19 @@ Initial scaffold:
 ```bash
 python scripts/generate_privileged_teacher_dataset.py \
   --out logs/privileged_teacher/trace.csv
+
+python scripts/audit_privileged_teacher_dataset.py \
+  --trace logs/privileged_teacher/trace.csv \
+  --plot \
+  --out-dir logs/privileged_teacher/audit
 ```
 
 This produces a debug-course teacher CSV with legal student features,
 `teacher_*` command targets, and auditable `world_*` / `teacher_next_gate_*`
 privileged columns that are excluded from the current learning feature vector.
+The audit script summarizes bearing/range/command ranges per course and writes
+course-level plots for the path, lookahead targets, bearings, and teacher
+commands.
 
 Once that works, upgrade the reference generator:
 

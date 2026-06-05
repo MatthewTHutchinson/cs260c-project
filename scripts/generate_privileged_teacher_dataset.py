@@ -172,6 +172,7 @@ def generate_rows(
                 gate=gate,
                 camera_tilt_up_rad=camera_tilt_up_rad,
             )
+            observed_distance = max(distance, 0.50)
 
             lookahead_target = position + tangent * min(lookahead_m, max(0.0, distance))
             lookahead_target = 0.45 * gate.center + 0.55 * lookahead_target
@@ -191,7 +192,7 @@ def generate_rows(
                 dtype=np.float64,
             )
             confidence = float(np.clip(1.0 - abs(bearing_h) / 1.0, 0.15, 0.98))
-            apparent_size = 2.7 * 320.0 / max(distance, 1e-3)
+            apparent_size = 2.7 * 320.0 / observed_distance
             rows.append(
                 {
                     "timestamp_s": f"{t:.6f}",
@@ -200,7 +201,7 @@ def generate_rows(
                     "confidence": f"{confidence:.6f}",
                     "bearing_h_rad": f"{bearing_h:.6f}",
                     "bearing_v_rad": f"{bearing_v:.6f}",
-                    "distance_m": f"{distance:.6f}",
+                    "distance_m": f"{observed_distance:.6f}",
                     "pixel_x": f"{320.0 + math.tan(bearing_h) * 320.0:.3f}",
                     "pixel_y": f"{180.0 - math.tan(bearing_v) * 320.0:.3f}",
                     "apparent_size_px": f"{apparent_size:.3f}",
@@ -282,4 +283,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

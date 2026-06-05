@@ -112,6 +112,15 @@ python scripts/generate_privileged_teacher_dataset.py \
   --out logs/privileged_teacher/trace.csv
 ```
 
+Audit the teacher before training on it:
+
+```bash
+python scripts/audit_privileged_teacher_dataset.py \
+  --trace logs/privileged_teacher/trace.csv \
+  --plot \
+  --out-dir logs/privileged_teacher/audit
+```
+
 Train on it:
 
 ```bash
