@@ -15,10 +15,10 @@ Problem
   -> What failed and what that teaches us
 ```
 
-The story is not "we restarted the project." The story is: I built and tested a
-competition-facing autonomous drone racing baseline that uses FPV perception,
-temporal gate tracking, and body-rate/thrust commands without privileged
-position.
+The story is not "we restarted the project." The story is: this is an FPV-based
+autonomous drone racing system with a clear perception, navigation, and control
+pipeline. Keep the talk focused on the system, the evidence, and the next
+algorithmic step.
 
 ## Slide 1: Problem And Constraint
 
@@ -28,7 +28,7 @@ On-slide:
 
 - Input: FPV camera plus telemetry
 - No GPS, depth, simulator gate IDs, or world pose
-- Output: pilot-style roll/pitch/yaw/thrust commands
+- Output: body-rate and thrust commands
 - Goal: complete VQ1-style courses reliably
 
 Figure:
@@ -41,47 +41,49 @@ FPV + telemetry -> gate estimate -> tracker state -> body-rate/thrust command
 
 Speaker note, about 45 seconds:
 
-> The task is autonomous drone racing, but the important constraint is that the
-> algorithm cannot use global position. It sees the world through an FPV camera
-> and telemetry, then has to output the same kind of pilot commands a controller
-> would use. For this stage, I optimized for completion and debuggability rather
-> than maximum speed.
+> This project is an FPV-based autonomous drone racing system. The input is
+> camera frames plus telemetry, and the output is body-rate and thrust commands.
+> The important constraint is that the system does not use global position, GPS,
+> depth, simulator gate IDs, or pre-known gate coordinates. So the core problem
+> is perception-driven navigation: detect the next gate, maintain a target over
+> time, and control the drone through it.
 
 ## Slide 2: Algorithm Architecture
 
-Title: `The system is a modular FPV-to-command autopilot`
+Title: `The system is a modular FPV-to-control autopilot`
 
 On-slide:
 
-- Classical gate detector now, neural detector backend later
-- Temporal tracker handles dropped detections
-- Reactive controller outputs body rates and thrust
-- Same `RacingCommand` boundary maps to the local simulator now and MAVSDK later
+- Perception estimates gate geometry from FPV frames
+- Tracking preserves a target through dropped detections
+- Navigation state chooses detected, tracked, commit, or search
+- Control outputs roll-rate, pitch-rate, yaw-rate, and thrust
 
 Figure:
 
 ```text
 GateDetector -> GateTracker -> ReactiveGateController -> RacingCommand
-                                                    -> simulator / MAVSDK adapter
+                                                    -> runtime adapter
 ```
 
 Speaker note, about 55 seconds:
 
-> The key design choice is the command boundary. The algorithm produces
-> `RacingCommand`: roll rate, pitch rate, yaw rate, and normalized thrust. That
-> keeps the racing logic separate from the simulator adapter. Locally I map it
-> to RC-style commands in the simulation environment, but the same boundary is
-> intended to map to MAVSDK attitude-rate and thrust commands for VQ1.
+> The system is split into perception, tracking, navigation state, and control.
+> The detector turns each FPV frame into a gate estimate. The tracker adds short
+> memory, so one missed frame does not immediately reset the system. The
+> controller then converts that navigation state into roll rate, pitch rate, yaw
+> rate, and thrust. That command boundary is important because the autonomy logic
+> stays independent of whichever simulation or runtime adapter is used.
 
 ## Slide 3: Perception To Control
 
-Title: `A visible gate becomes bearing, range, confidence, and a mode`
+Title: `Tracking turns noisy detections into navigation modes`
 
 On-slide:
 
-- Detector estimates gate center, bearing, rough range, confidence
-- Tracker modes: `detected`, `tracked`, `commit`, `search`
-- `commit`: pass through instead of chasing clipped gate edges
+- Detector: gate center, bearing, range, confidence
+- Tracker: short memory over missed frames
+- `commit`: continue through a near gate
 - `search`: level, brake drift, then yaw scan
 
 Figure:
@@ -91,16 +93,16 @@ Figure:
 
 Speaker note, about 60 seconds:
 
-> The detector is intentionally inspectable. It segments gate-like colors,
-> extracts contours, and estimates image bearing and rough range. The tracker is
-> what makes this usable in flight: it smooths short missed detections, commits
-> near the gate, and switches to search only after confidence expires. Search
-> was important to fix because yawing while still pitched forward makes the
-> drone scan off-axis, so the current version levels and brakes first.
+> The perception output is not used directly as a steering command. It first
+> becomes a tracked navigation target. If the gate is visible, the mode is
+> detected. If the detector drops out briefly, the tracker holds the target. When
+> the gate is near, commit mode keeps the drone moving through instead of chasing
+> clipped edges. If confidence expires, search mode levels the drone, brakes
+> drift, and then yaw-scans for a new gate.
 
 ## Slide 4: Local Validation Results
 
-Title: `The baseline completes simple local courses`
+Title: `Evidence: simple tracks work; curved tracks expose the gap`
 
 On-slide:
 
@@ -126,40 +128,42 @@ Figure:
   - `assets/presentation/gate_sequence_commit.jpg`
   - `assets/presentation/gate_sequence_search.jpg`
 
-Speaker note, about 55 seconds:
+Speaker note, about 50 seconds:
 
-> In local simulation validation, the baseline completed the straight, mild lateral,
-> height-varied, and four-gate straight courses. The latest core suite completed
-> all four. But the same controller failed on harder curved courses: it got two
-> of four gates on the circular arc and one of five on the S-curve. That is a
-> useful result because it tells us exactly where the baseline stops working.
+> The baseline completes the simple course suite: straight, mild lateral,
+> height-varied, and four-gate straight tracks. That shows the perception,
+> tracking, and control loop is functioning end to end. The failure cases are
+> more informative: on the circular arc it reaches two of four gates, and on the
+> S-curve it reaches one of five. So the current system is not just failing
+> randomly; it fails when the next correct action depends on future course
+> geometry.
 
 ## Slide 5: What Failed And Next Step
 
-Title: `The next missing layer is lookahead navigation`
+Title: `Next step: sequence-aware navigation plus learned control`
 
 On-slide:
 
 - Current controller reacts to the visible gate
-- Curved tracks require sequence belief and future-gate lookahead
-- Next: local corridor target or short-horizon planner
-- Next deep learning step: neural gate detector + recurrent learned controller
+- Curved tracks require sequence belief and lookahead
+- Add a local corridor target or short-horizon planner
+- Learn the policy with CNN visual features plus GRU/LSTM memory
 
 Figure:
 
 - Best figure: `assets/presentation/circular_arc_trace.png`
 - Backup/appendix figure: `assets/presentation/s_curve_trace.png`
 
-Speaker note, about 65 seconds:
+Speaker note, about 60 seconds:
 
-> The main limitation is not just detection. The controller can center a visible
-> gate, but it does not understand the future course geometry. On a circular or
-> S-shaped track, that means it can pass one gate and then fly wide or cut the
-> wrong line. The next algorithmic layer should be sequence-aware navigation:
-> track which gate is next, infer a local corridor, and command a body-frame
-> target with lookahead. The deep learning extension is to replace the classical
-> detector with a neural gate detector, then train a recurrent controller that
-> maps recent FPV features and telemetry into body-rate and thrust commands.
+> The main limitation is not just detection. The current controller can center a
+> visible gate, but it does not reason about future course geometry. The next
+> classical step is sequence-aware navigation: estimate which gate is next, infer
+> a local corridor, and command a body-frame target with lookahead. The deep
+> learning version I would test is a CNN plus GRU policy. The CNN extracts gate
+> and visual-track features from recent FPV frames, the GRU keeps short-term
+> memory through occlusions and fast turns, and a small MLP head outputs roll
+> rate, pitch rate, yaw rate, and thrust.
 
 ## Recommended Figures
 
