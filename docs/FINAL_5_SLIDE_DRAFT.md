@@ -179,9 +179,8 @@ Use video only if it does not steal time:
 
 1. A short local-simulator preview GIF can work as silent background or quick
    visual context on Slide 1.
-2. `legacy/pybullet/assets/presentation/state_champion_demo.mp4` is a
-   9-second legacy PyBullet clip. Skip this in the main talk unless explicitly
-  labeled as old work; it risks confusing the current simulation/VQ1 story.
+2. Skip old PyBullet clips in the main talk; they risk confusing the current
+   simulation/VQ1 story.
 
 Probably skip these in the main 5 slides:
 

@@ -16,13 +16,7 @@ control the drone
 plan and navigate the course
 ```
 
-## Archived Docs
-
-Stale midterm-era documents were moved to:
-
-```text
-docs/archive/2026-05-ground-up-reset/
-```
+## Reference Docs
 
 The raw reference PDFs remain in:
 
@@ -92,7 +86,8 @@ VQ1 simulator
   -> MAVLink command sender
 ```
 
-The old PyBullet learner is quarantined under `legacy/pybullet/`. It should not define the architecture.
+The old PyBullet learner has been removed from the active repo. It should not
+define the architecture.
 
 ## Development Priorities
 

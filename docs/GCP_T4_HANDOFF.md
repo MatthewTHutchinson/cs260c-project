@@ -183,8 +183,9 @@ base 3.13 interpreter.
 These should run without simulator access:
 
 ```bash
-source .venv/bin/activate
+conda activate cs260c-t4
 python -m py_compile algorithm/*.py scripts/*.py
+python -m py_compile learning/*.py
 python scripts/audit_sign_conventions.py
 python scripts/audit_sequence_selection.py
 python scripts/audit_lateral_reacquisition.py
@@ -193,19 +194,13 @@ python scripts/inspect_gate_frames.py --demo --demo-frames 3 --out-dir logs/t4_d
 
 Expected: no Python errors, and demo inspection writes overlays/masks.
 
-## 5. First Training Work To Build
+## 5. First Training Work
 
-Build a training scaffold around feature logs, not image CNNs.
+The first training scaffold now exists under:
 
-Recommended package/file additions:
-
-```text
-learning/
-  datasets.py          # load trace CSVs and frame-derived feature logs
-  feature_policy.py    # GRU/MLP policy
-  train_bc.py          # behavioral cloning
-  eval_policy.py       # offline policy evaluation on held-out logs
-  README.md            # exact commands and expected outputs
+```bash
+ls learning
+sed -n '1,220p' learning/README.md
 ```
 
 The first model input should be low-dimensional:
@@ -229,6 +224,30 @@ roll_rate
 pitch_rate
 yaw_rate
 thrust
+```
+
+Run the synthetic smoke test first:
+
+```bash
+python -m learning.train_bc \
+  --demo-synthetic \
+  --epochs 20 \
+  --batch-size 64 \
+  --out checkpoints/feature_bc_synthetic.pt
+
+python -m learning.eval_policy \
+  --checkpoint checkpoints/feature_bc_synthetic.pt \
+  --traces logs/learning_synthetic/trace.csv
+```
+
+Then try local trace data if available:
+
+```bash
+python -m learning.train_bc \
+  --traces logs/elodin_course_suite \
+  --epochs 40 \
+  --batch-size 128 \
+  --out checkpoints/feature_bc_local_traces.pt
 ```
 
 ## 6. First Experiment

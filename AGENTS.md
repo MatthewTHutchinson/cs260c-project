@@ -12,9 +12,9 @@ FPV gate recognition
   -> simulator/runtime adapter
 ```
 
-The old PyBullet BC/DAgger/PPO project is preserved under `legacy/pybullet/`
-for historical context only. Do not use it as the active project direction or
-as the main final-project claim.
+The old PyBullet BC/DAgger/PPO project has been removed from the active repo.
+Do not use it as the active project direction or as the main final-project
+claim.
 
 ## Active System Architecture
 
@@ -101,6 +101,26 @@ Control modes:
 Keep sign/frame checks centralized. Camera pitch, body attitude, ENU/NED, and
 RC/MAVSDK mappings are high-risk bug sources.
 
+## Learning Scaffold
+
+The active learning path lives under:
+
+```text
+learning/
+```
+
+The first policy is feature-based:
+
+```text
+classical CV gate features + telemetry + tracker history
+  -> GRU/MLP policy
+  -> RacingCommand
+```
+
+Do not train a raw-image CNN first unless official simulator frames show that
+classical CV is the bottleneck. Do not use privileged world pose, simulator gate
+IDs, GPS, depth, or pre-known gate coordinates as policy inputs.
+
 ## Elodin Harness
 
 The local Elodin practice harness lives outside this repo:
@@ -163,7 +183,6 @@ uv run pytest tests/test_camera_shape.py
 
 ## Project Rules
 
-- Keep active VQ1/Elodin work out of `legacy/pybullet/`.
 - Do not present old PyBullet track results as the current autonomous racing
   algorithm.
 - Do not let privileged simulator state leak into the competition-facing

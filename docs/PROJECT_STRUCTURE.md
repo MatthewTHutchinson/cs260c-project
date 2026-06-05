@@ -1,8 +1,9 @@
 # Project Structure
 
-Date: 2026-05-31
+Date: 2026-06-05
 
-The repo is organized to keep the new VQ1/local-simulation-facing project separate from the old PyBullet training stack.
+The repo is organized around the current VQ1/local-simulation-facing project.
+The old PyBullet training stack has been removed from the active repo.
 
 ## Active Project
 
@@ -12,6 +13,7 @@ Use these folders for current work:
 algorithm/
 assets/presentation/
 docs/
+learning/
 scripts/
 external/
 ```
@@ -25,6 +27,10 @@ external/
 - frame-convention helpers
 
 `docs/` contains active final-project and VQ1 planning docs.
+
+`learning/` contains the feature-based GRU/MLP behavioral-cloning scaffold for
+the T4 training path. It should consume classical CV/tracker features and
+allowed telemetry, not raw simulator truth.
 
 `assets/presentation/` contains current final-presentation figures and overlays.
 
@@ -46,18 +52,6 @@ This includes the current technical spec, MAVLink schema, papers, and captured s
 `docs/reference/gatenet_external.md` records the local GateNet clone, upstream
 commit, and practical integration caveats.
 
-## Legacy
-
-The old simulator/training stack lives here:
-
-```text
-legacy/pybullet/
-```
-
-It includes the old configs, tracks, PyBullet environment, training scripts, learned-policy code, evaluation tools, and presentation assets.
-
-Do not add new VQ1/local-simulation work there. Only touch it when intentionally inspecting or citing the historical work.
-
 ## External Harness
 
 The local practice harness is a sibling repo, not vendored into this project:
@@ -72,6 +66,8 @@ This keeps third-party simulator code, Betaflight builds, run databases, and exp
 
 If the work is part of the final autonomous racing algorithm, put it in `algorithm/`.
 
+If the work is a feature-based learned policy, put it in `learning/`.
+
 If the work explains or supports the final project, put it in `docs/`.
 
 If the work is a current final-presentation visual, put it in `assets/presentation/`.
@@ -80,5 +76,3 @@ If the work runs the local simulation/VQ1 workflow, put it in `scripts/`.
 
 If the work is an upstream research checkout, keep it under `external/` and
 document the integration path in `docs/reference/`.
-
-If the work is about old PyBullet policies, tracks, or training runs, put it in `legacy/pybullet/`.

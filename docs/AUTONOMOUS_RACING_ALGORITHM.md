@@ -249,13 +249,9 @@ If we follow that boundary, the simulator's extra pose field stops being a conta
 
 The local simulation environment is now the primary harness while Windows/VQ1 access is unavailable.
 
-PyBullet is preserved only as legacy work under:
-
-```text
-legacy/pybullet/
-```
-
-That old stack can still provide historical context, but it should not drive the final-project claims. The main harness work is now:
+The old PyBullet stack has been removed from the active repo. It can be
+mentioned only as historical context, and it should not drive the final-project
+claims. The main harness work is now:
 
 - use the stable no-FPV simulation smoke path for Betaflight/control checks
 - use the interactive simulator path separately for FPV/render inspection

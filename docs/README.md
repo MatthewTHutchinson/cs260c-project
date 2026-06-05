@@ -2,8 +2,8 @@
 
 This folder contains the active VQ1/final-project docs.
 
-Old PyBullet training and track-development material is quarantined under
-`legacy/pybullet/`, and older midterm docs remain in `docs/archive/`.
+Old PyBullet training and track-development material has been removed from the
+active repo. Older strategy notes should stay out of the current project path.
 
 ## Active Docs
 
@@ -20,6 +20,8 @@ Old PyBullet training and track-development material is quarantined under
 - `NEURAL_CV_INTEGRATION.md`: learned gate detector options, ONNX backend hook, and validation plan.
 - `DRONE_CONTROL.md`: command architecture, MAVLink mapping options, and safe VQ1 control strategy.
 - `PATH_PLANNING_NAVIGATION.md`: gate-order navigation, local guidance, search behavior, and VQ1/VQ2 planning split.
+- `NEXT_STEPS_LEARNED_POLICY.md`: T4, minimum-snap, BC/DAgger/PPO, and feature-policy roadmap.
+- `GCP_T4_HANDOFF.md`: cloud VM setup and training handoff instructions.
 
 ## Reference
 
@@ -29,8 +31,3 @@ Old PyBullet training and track-development material is quarantined under
 - `reference/elodin_ai_grand_prix_harness.md`: captured local simulator reference article.
 - `reference/ai_gp_vq1_simulator_search.md`: captured VQ1 simulator search/reference notes.
 - `reference/Gmail - *.pdf`: older downloaded emails kept as historical reference.
-
-## Archive
-
-- `archive/2026-05-ground-up-reset/`: midterm-era progress, report, portfolio, presentation, and old strategy docs. Treat these as historical, not current project direction.
-- `../legacy/pybullet/`: old PyBullet code, configs, tracks, training scripts, and assets.

@@ -7,24 +7,20 @@ FPV gate recognition
   -> temporal tracking
   -> reactive navigation
   -> body-rate/thrust or RC command adapter
+  -> optional feature-based learned policy
 ```
 
-The old PyBullet / BC / DAgger / PPO stack has been quarantined in:
-
-```text
-legacy/pybullet/
-```
-
-It is preserved for reference, but it is not the active project direction.
+The old PyBullet / BC / DAgger / PPO stack has been removed from the active
+repo. Do not use it as the final-project claim or current implementation path.
 
 ## Active Map
 
 - `algorithm/`: current autonomous racing algorithm and adapter helpers.
+- `learning/`: feature-based GRU/MLP behavioral-cloning scaffold.
 - `docs/`: current project docs, competition context, and final-project framing.
 - `scripts/`: current operational scripts.
 - `docs/reference/`: official specs, MAVLink schema, papers, and external reference captures.
 - `external/`: ignored local research checkouts such as GateNet.
-- `legacy/pybullet/`: old simulator, tracks, policies, configs, training code, and presentation assets.
 
 ## Start Here
 
@@ -127,11 +123,12 @@ Validate active code:
 
 ```bash
 /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m py_compile algorithm/*.py scripts/*.py
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m py_compile learning/*.py
 /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python scripts/audit_sequence_selection.py
 ```
 
 ## Project Rule
 
-Do not mix new VQ1/local-simulation work into `legacy/pybullet/`.
-
-Do not present old PyBullet track results as the final algorithm. The final project should present the current autonomous racing algorithm and use PyBullet only as historical context for why the simulator strategy changed.
+Do not present old PyBullet track results as the final algorithm. The final
+project should present the current autonomous racing algorithm and the current
+feature-policy learning path.

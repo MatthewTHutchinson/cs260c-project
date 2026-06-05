@@ -239,7 +239,9 @@ All sign conventions must be tested with small commands:
 
 ## Local Harness Control Reset
 
-The old body-frame waypoint action is no longer the main research target. The active local harness is the current simulation environment, with the PyBullet stack preserved under `legacy/pybullet/`.
+The old body-frame waypoint action is no longer the main research target. The
+active local harness is the current simulation environment, and the old PyBullet
+stack has been removed from the active repo.
 
 New harness work should add a control path that better matches the internal command interface:
 
