@@ -126,10 +126,11 @@ class FeatureSpec:
     prefer_teacher_targets: bool = True
 
     @classmethod
-    def default(cls) -> "FeatureSpec":
+    def default(cls, *, include_prev_command: bool = True) -> "FeatureSpec":
         names: list[str] = list(BASE_FEATURE_COLUMNS)
         names.extend(f"mode_{mode}" for mode in MODE_NAMES)
-        names.extend(f"prev_{name}" for name in TARGET_COLUMNS)
+        if include_prev_command:
+            names.extend(f"prev_{name}" for name in TARGET_COLUMNS)
         names.extend(
             (
                 "bearing_h_delta",
@@ -255,14 +256,18 @@ class NormalizedDataset(Dataset):
     def __init__(self, base: Dataset, mean: torch.Tensor, std: torch.Tensor) -> None:
         self.base = base
         self.mean = mean.float()
-        self.std = std.float().clamp_min(1e-6)
+        self.std = std.float()
+        self.active = self.std >= 1e-6
+        self.safe_std = torch.where(self.active, self.std, torch.ones_like(self.std))
 
     def __len__(self) -> int:
         return len(self.base)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         x, y = self.base[idx]
-        return (x - self.mean) / self.std, y
+        normalized = (x - self.mean) / self.safe_std
+        normalized = torch.where(self.active, normalized, torch.zeros_like(normalized))
+        return normalized, y
 
 
 def fit_feature_normalizer(dataset: Dataset) -> tuple[torch.Tensor, torch.Tensor]:

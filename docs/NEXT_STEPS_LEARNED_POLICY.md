@@ -336,6 +336,11 @@ The trained GRU can now be loaded through
 checkpoint loads, normalizes features, preserves sequence history, and emits a
 clipped `RacingCommand`.
 
+Prefer checkpoints trained with `--no-prev-command-features` for the first
+runtime rollouts. Previous-command features improve teacher-forced offline MSE,
+but without DAgger/closed-loop data they create a train/runtime mismatch because
+the deployed policy feeds back its own previous predictions.
+
 ## Robustness Work
 
 Randomization should be added before trusting learned-policy results:

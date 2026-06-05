@@ -14,6 +14,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from learning.datasets import NormalizedDataset, TraceSequenceDataset
+from learning.datasets import FeatureSpec
 from learning.feature_policy import load_checkpoint
 
 
@@ -114,9 +115,13 @@ def main() -> int:
     model, payload = load_checkpoint(str(args.checkpoint), map_location=device)
     model.to(device)
     sequence_length = int(payload.get("metadata", {}).get("sequence_length", 12))
+    spec = None
+    if payload.get("metadata", {}).get("no_prev_command_features"):
+        spec = FeatureSpec.default(include_prev_command=False)
     dataset = TraceSequenceDataset(
         args.traces,
         sequence_length=sequence_length,
+        spec=spec,
         include_courses=args.include_courses,
         exclude_courses=args.exclude_courses,
     )

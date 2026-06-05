@@ -296,13 +296,24 @@ python -m learning.train_bc \
   --exclude-courses s_curve \
   --epochs 20 \
   --batch-size 256 \
-  --out logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e.pt
+  --no-prev-command-features \
+  --out logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.pt
 
 python -m learning.eval_policy \
-  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e.pt \
+  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.pt \
   --traces logs/privileged_teacher/trace_with_variants.csv \
   --include-courses s_curve \
-  --predictions-out logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_s_curve_predictions.csv
+  --predictions-out logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev_s_curve_predictions.csv
+
+python scripts/audit_policy_predictions.py \
+  --predictions logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev_s_curve_predictions.csv \
+  --plot logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev_s_curve_audit.png
+
+python scripts/smoke_learned_controller.py \
+  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.pt \
+  --trace logs/privileged_teacher/trace_with_variants.csv \
+  --course s_curve \
+  --rows 24
 ```
 
 Inspect the audit output before spending GPU time. The useful plots are the
@@ -320,11 +331,16 @@ circular_arc mse=0.00039825
 s_curve mse=0.00130725
 leave-s_curve-out eval on s_curve mse=0.16744989
 leave-s_curve-out with randomized variants mse=0.00024772
+no-prev-command runtime checkpoint mse=0.00101455
+no-prev-command runtime smoke thrust_norm=0.557330
 ```
 
 The held-out S-curve result is intentionally harsh. It means the current
 base teacher dataset is learnable but too narrow for shape generalization.
 Randomized S/arc variants fix that first generalization failure.
+Use the no-previous-command checkpoint for runtime smoke tests until DAgger or
+closed-loop training data exists. The previous-command model has lower offline
+MSE, but it depends on teacher-forced previous commands and can fail replay.
 
 ## 6. First Experiment
 

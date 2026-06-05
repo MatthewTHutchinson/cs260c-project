@@ -58,6 +58,11 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--include-courses", nargs="*", help="Only train on these course names.")
     parser.add_argument("--exclude-courses", nargs="*", help="Skip these course names.")
+    parser.add_argument(
+        "--no-prev-command-features",
+        action="store_true",
+        help="Drop previous command inputs for runtime-friendly closed-loop inference.",
+    )
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -67,10 +72,17 @@ def main() -> int:
     if not traces:
         raise SystemExit("provide --traces or use --demo-synthetic")
 
+    spec = None
+    if args.no_prev_command_features:
+        from learning.datasets import FeatureSpec
+
+        spec = FeatureSpec.default(include_prev_command=False)
+
     dataset = TraceSequenceDataset(
         traces,
         sequence_length=args.sequence_length,
         stride=args.stride,
+        spec=spec,
         include_courses=args.include_courses,
         exclude_courses=args.exclude_courses,
     )
@@ -124,6 +136,7 @@ def main() -> int:
                     "best_val_mse": best_val,
                     "include_courses": args.include_courses or [],
                     "exclude_courses": args.exclude_courses or [],
+                    "no_prev_command_features": bool(args.no_prev_command_features),
                 },
             )
 

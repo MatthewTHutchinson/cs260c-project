@@ -39,7 +39,9 @@ class LearnedFeatureController:
         self.feature_names = tuple(self.payload.get("feature_names", FeatureSpec.default().feature_names))
         self.sequence_length = int(self.payload.get("metadata", {}).get("sequence_length", 12))
         self.mean = self.payload["feature_mean"].to(self.device).float()
-        self.std = self.payload["feature_std"].to(self.device).float().clamp_min(1e-6)
+        self.std = self.payload["feature_std"].to(self.device).float()
+        self.active_features = self.std >= 1e-6
+        self.safe_std = torch.where(self.active_features, self.std, torch.ones_like(self.std))
         self.max_roll_rate_rad_s = float(max_roll_rate_rad_s)
         self.max_pitch_rate_rad_s = float(max_pitch_rate_rad_s)
         self.max_yaw_rate_rad_s = float(max_yaw_rate_rad_s)
@@ -71,7 +73,8 @@ class LearnedFeatureController:
 
         x = torch.from_numpy(np.stack(tuple(self._history)).astype(np.float32))
         x = x.unsqueeze(0).to(self.device)
-        x = (x - self.mean) / self.std
+        x = (x - self.mean) / self.safe_std
+        x = torch.where(self.active_features, x, torch.zeros_like(x))
         with torch.no_grad():
             y = self.model(x).squeeze(0).detach().cpu().numpy()
 
