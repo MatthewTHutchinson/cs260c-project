@@ -8,7 +8,7 @@ This is the final-project-facing algorithm description. The project story is not
 FPV gate recognition
   -> temporal gate tracking
   -> reactive navigation state
-  -> body-rate/thrust control
+  -> reactive or learned feature-policy body-rate/thrust control
   -> simulator-specific command adapter
 ```
 
@@ -55,6 +55,8 @@ At each control step:
 4. Update temporal tracker.
 5. Choose navigation mode: `search`, `detected`, `tracked`, `commit`, or `recover`.
 6. Convert gate bearing/range/confidence into body-rate/thrust command.
+   - default: inspectable reactive controller
+   - optional: GRU feature-policy checkpoint using the same legal features
 7. Apply safety limits.
 8. Send command through the backend adapter.
 9. Log raw frame, detection, telemetry, command, and simulator status.
@@ -66,7 +68,7 @@ Simulator / VQ1 runtime
   -> FPV frame logger + telemetry adapter
   -> GateDetector or neural detector backend
   -> GateTracker
-  -> ReactiveGateController
+  -> ReactiveGateController or LearnedFeatureController
   -> RacingCommand
   -> backend adapter
       -> local simulator RC today
@@ -89,6 +91,12 @@ backend now exists as an optional module so learned perception can be tested
 without changing the tracker, controller, or command boundary. GateNet-style
 models are selected through the same runtime detector factory once exported to
 ONNX.
+
+The learned control path is also optional. `algorithm/learned_controller.py`
+loads a trained GRU checkpoint and maps the same detector/tracker features plus
+allowed telemetry into `RacingCommand`. `AutonomousRacingPilot` only uses this
+controller for usable gate estimates; search/lost-gate behavior still falls
+back to the reactive controller.
 
 ## Gate Recognition
 

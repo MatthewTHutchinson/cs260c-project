@@ -9,6 +9,7 @@ import numpy as np
 
 from algorithm.detector_factory import build_gate_tracker
 from algorithm.gate_tracker import GateTracker
+from algorithm.learned_controller import LearnedFeatureController
 from algorithm.reactive_controller import ReactiveGateController
 from algorithm.types import GateEstimate, RacingCommand, VehicleTelemetry
 
@@ -28,15 +29,19 @@ class AutonomousRacingPilot:
         self,
         tracker: Optional[GateTracker] = None,
         controller: Optional[ReactiveGateController] = None,
+        learned_controller: Optional[LearnedFeatureController] = None,
         frame_format: str = "bgr",
     ) -> None:
         self.tracker = tracker or build_gate_tracker()
         self.controller = controller or ReactiveGateController()
+        self.learned_controller = learned_controller
         self.frame_format = frame_format
 
     def reset(self) -> None:
         self.tracker.reset()
         self.controller.reset()
+        if self.learned_controller is not None:
+            self.learned_controller.reset()
 
     def update(
         self,
@@ -58,5 +63,8 @@ class AutonomousRacingPilot:
             timestamp_s=timestamp,
             frame_format=self.frame_format,
         )
-        command = self.controller.compute(gate, telemetry)
+        if self.learned_controller is not None and gate.is_usable:
+            command = self.learned_controller.compute(gate, telemetry)
+        else:
+            command = self.controller.compute(gate, telemetry)
         return command, gate

@@ -329,6 +329,13 @@ result fails badly on the base dataset, but improves after adding randomized
 curved and S-shaped teacher courses. That makes dataset diversity the next
 primary lever before simply scaling the model.
 
+The trained GRU can now be loaded through
+`algorithm.learned_controller.LearnedFeatureController` and attached to
+`AutonomousRacingPilot` as an optional controller. Use
+`scripts/smoke_learned_controller.py` before any simulator run to confirm the
+checkpoint loads, normalizes features, preserves sequence history, and emits a
+clipped `RacingCommand`.
+
 ## Robustness Work
 
 Randomization should be added before trusting learned-policy results:

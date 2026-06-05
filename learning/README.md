@@ -220,3 +220,17 @@ The model can fit the upgraded teacher when S-curve examples are included, but
 it does not generalize to S-curves from straight/soft-curve examples alone.
 Randomized curved teacher data fixes the first generalization failure much more
 effectively than simply increasing model complexity.
+
+## Runtime Smoke
+
+After training a checkpoint, verify that it can be loaded by the competition
+package and converted into a clipped `RacingCommand`:
+
+```bash
+python scripts/smoke_learned_controller.py \
+  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e.pt
+```
+
+The runtime wrapper lives in `algorithm/learned_controller.py`. It is optional:
+`AutonomousRacingPilot` uses it only when one is supplied and the current gate
+estimate is usable, otherwise the reactive controller handles search/fallback.
