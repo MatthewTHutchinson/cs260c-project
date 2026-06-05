@@ -241,7 +241,7 @@ index 4a5df72..13b9dbe 100644
      """
  
      index: int
-@@ -50,14 +51,67 @@ class Gate:
+@@ -50,14 +51,68 @@ class Gate:
      yaw_deg: float = 0.0
  
  
@@ -1709,7 +1709,7 @@ new file mode 100644
 index 0000000..c3cee00
 --- /dev/null
 +++ b/solver/cs260c_pilot.py
-@@ -0,0 +1,332 @@
+@@ -0,0 +1,352 @@
 +"""CS 260C perception-guided racing pilot for the Elodin harness.
 +
 +This solver deliberately ignores Elodin's world pose. It consumes only the FPV
@@ -1841,6 +1841,10 @@ index 0000000..c3cee00
 +            "body_vx_m_s",
 +            "body_vy_m_s",
 +            "body_vz_m_s",
++            "debug_world_x_m",
++            "debug_world_y_m",
++            "debug_world_z_m",
++            "debug_world_yaw_rad",
 +            "mode",
 +            "confidence",
 +            "bearing_h_rad",
@@ -1896,6 +1900,11 @@ index 0000000..c3cee00
 +    if attitude_quat is not None:
 +        body_forward_elevation = f"{body_forward_elevation_from_quat_xyzw(attitude_quat):.6f}"
 +    body_velocity = _body_linear_velocity(update)
++    world_pos = np.asarray(update.world_pos, dtype=np.float64)
++    world_xyz = world_pos[4:7] if world_pos.size >= 7 else None
++    debug_yaw = ""
++    if attitude_quat is not None:
++        debug_yaw = f"{_yaw_from_quat_xyzw(attitude_quat):.6f}"
 +
 +    writer.writerow(
 +        {
@@ -1908,6 +1917,10 @@ index 0000000..c3cee00
 +            "body_vx_m_s": "" if body_velocity is None else f"{body_velocity[0]:.6f}",
 +            "body_vy_m_s": "" if body_velocity is None else f"{body_velocity[1]:.6f}",
 +            "body_vz_m_s": "" if body_velocity is None else f"{body_velocity[2]:.6f}",
++            "debug_world_x_m": "" if world_xyz is None else f"{world_xyz[0]:.6f}",
++            "debug_world_y_m": "" if world_xyz is None else f"{world_xyz[1]:.6f}",
++            "debug_world_z_m": "" if world_xyz is None else f"{world_xyz[2]:.6f}",
++            "debug_world_yaw_rad": debug_yaw,
 +            "mode": gate.mode.value,
 +            "confidence": f"{gate.confidence:.6f}",
 +            "bearing_h_rad": f"{gate.bearing_h_rad:.6f}",
@@ -1981,6 +1994,13 @@ index 0000000..c3cee00
 +    if attitude_quat is None or world_vel.size < 6:
 +        return None
 +    return body_velocity_from_world_velocity_quat_xyzw(world_vel[3:6], attitude_quat)
++
++
++def _yaw_from_quat_xyzw(quat: np.ndarray) -> float:
++    x, y, z, w = [float(v) for v in quat]
++    siny_cosp = 2.0 * (w * z + x * y)
++    cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
++    return math.atan2(siny_cosp, cosy_cosp)
 +
 +
 +def _telemetry(update: SensorUpdate) -> VehicleTelemetry:

@@ -381,6 +381,23 @@ spend more T4 time scaling the model until the teacher labels include launch
 guards, off-nominal lateral recovery, and closed-loop-like deviations from the
 centerline.
 
+Follow-up after adding augmented teacher episodes:
+
+```text
+trace_augmented.csv rows=14280 courses=26
+augmented padded checkpoint=feature_bc_augmented_padded_leave_s_curve_out_20e_no_prev.npz
+10 s learned easy rollout: DNF, gates=0/3
+first learned thrust: 0.300 -> 0.722
+final z after 4 s smoke: 0.46 m -> 1.29 m
+10 s rollout reached x=9.92 m near gate 0 but y=1.62 m, so it missed laterally
+```
+
+This means the direction is correct but incomplete. The next teacher upgrade is
+closed-loop relabeling: log privileged debug world position from failed Elodin
+rollouts, compute the desired lookahead/minimum-snap correction from that
+off-line state, and train those labels back onto the same legal FPV/telemetry
+features.
+
 ## Robustness Work
 
 Randomization should be added before trusting learned-policy results:

@@ -320,6 +320,35 @@ python scripts/smoke_learned_controller.py \
   --rows 24
 ```
 
+Current next dataset for serious BC is the augmented teacher trace:
+
+```bash
+python scripts/generate_privileged_teacher_dataset.py \
+  --out logs/privileged_teacher/trace_augmented.csv \
+  --random-s-curve-variants 12 \
+  --random-arc-variants 8 \
+  --launch-samples 24 \
+  --off-nominal-episodes-per-course 4 \
+  --off-nominal-length 24 \
+  --random-seed 17
+
+python -m learning.train_bc \
+  --traces logs/privileged_teacher/trace_augmented.csv \
+  --exclude-courses s_curve \
+  --epochs 20 \
+  --batch-size 256 \
+  --no-prev-command-features \
+  --out logs/learning_smoke/feature_bc_augmented_padded_leave_s_curve_out_20e_no_prev.pt
+
+python -m learning.export_policy_npz \
+  --checkpoint logs/learning_smoke/feature_bc_augmented_padded_leave_s_curve_out_20e_no_prev.pt \
+  --out logs/learning_smoke/feature_bc_augmented_padded_leave_s_curve_out_20e_no_prev.npz
+```
+
+As of the first local smoke, this augmented checkpoint fixes launch thrust but
+still misses laterally in closed loop. Treat it as the first relabeling baseline,
+not the final learned pilot.
+
 Inspect the audit output before spending GPU time. The useful plots are the
 curved tracks first: `circular_arc_teacher_audit.png` and
 `s_curve_teacher_audit.png`. Also check `command_saturation_pct`; some

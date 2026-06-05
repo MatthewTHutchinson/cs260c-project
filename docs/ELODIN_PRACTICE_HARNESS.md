@@ -349,6 +349,12 @@ The suite writes per-course traces/logs/frames under:
 logs/elodin_course_suite/
 ```
 
+The CS260C trace also includes `debug_world_x_m`, `debug_world_y_m`,
+`debug_world_z_m`, and `debug_world_yaw_rad` when running against the local
+Elodin harness. These are privileged debug columns for offline scoring,
+closed-loop relabeling, and failure analysis only. They must not become inputs
+to `AutonomousRacingPilot`.
+
 Validation rule:
 
 - If `elodin_pilot_trace_editor.csv` is all `search`, `frame_fresh` is always

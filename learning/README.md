@@ -167,6 +167,24 @@ python scripts/generate_privileged_teacher_dataset.py \
   --random-seed 11
 ```
 
+Generate the current augmented teacher dataset with launch and off-nominal
+recovery episodes:
+
+```bash
+python scripts/generate_privileged_teacher_dataset.py \
+  --out logs/privileged_teacher/trace_augmented.csv \
+  --random-s-curve-variants 12 \
+  --random-arc-variants 8 \
+  --launch-samples 24 \
+  --off-nominal-episodes-per-course 4 \
+  --off-nominal-length 24 \
+  --random-seed 17
+```
+
+Rows are split by `episode_id`, so GRU windows do not cross between nominal,
+launch, and recovery sequences. Startup windows are padded the same way the
+runtime controller pads its first few frames.
+
 Train on those variants while still holding out the canonical `s_curve`:
 
 ```bash
@@ -298,6 +316,28 @@ Current S-curve comparison:
 learned_vs_teacher mse=0.00116282
 reactive_vs_teacher mse=0.17836463
 ```
+
+Current augmented/padded smoke result:
+
+```text
+dataset=logs/privileged_teacher/trace_augmented.csv
+rows=14280
+courses=26
+checkpoint=logs/learning_smoke/feature_bc_augmented_padded_leave_s_curve_out_20e_no_prev.npz
+heldout_s_curve_mse=0.02419935
+comparison_s_curve learned_vs_teacher mse=0.02409630
+comparison_s_curve reactive_vs_teacher mse=0.17126263
+phase=launch learned_vs_teacher mse=0.00065725
+phase=nominal learned_vs_teacher mse=0.00175707
+phase=off_nominal learned_vs_teacher mse=0.13467118
+```
+
+The augmented labels fixed the first closed-loop failure mode: launch/thrust.
+In a 10 s `easy` Elodin smoke, first learned thrust increased from `0.300` to
+`0.722`, and the drone climbed to racing height. It still missed gate 0
+laterally, so the next labels should come from closed-loop failure traces with
+privileged debug world position, then relabeled back to the same legal feature
+inputs.
 
 The runtime wrapper lives in `algorithm/learned_controller.py`. It is optional:
 `AutonomousRacingPilot` uses it only when one is supplied and the current gate

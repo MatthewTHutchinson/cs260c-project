@@ -103,17 +103,19 @@ def parse_course_filter(values: Iterable[str] | None) -> set[str] | None:
     return courses or None
 
 
-def split_rows_by_course(rows: list[dict[str, str]]) -> list[list[dict[str, str]]]:
+def split_rows_by_episode(rows: list[dict[str, str]]) -> list[list[dict[str, str]]]:
     groups: list[list[dict[str, str]]] = []
     current: list[dict[str, str]] = []
-    current_course: str | None = None
+    current_key: tuple[str, str] | None = None
     for row in rows:
         course = str(row.get("course", "")).strip()
-        if current and course != current_course:
+        episode = str(row.get("episode_id", "")).strip()
+        key = (course, episode)
+        if current and key != current_key:
             groups.append(current)
             current = []
         current.append(row)
-        current_course = course
+        current_key = key
     if current:
         groups.append(current)
     return groups
@@ -199,6 +201,7 @@ class TraceSequenceDataset(Dataset):
         spec: FeatureSpec | None = None,
         include_courses: Iterable[str] | None = None,
         exclude_courses: Iterable[str] | None = None,
+        pad_start: bool = True,
     ) -> None:
         self.sequence_length = int(sequence_length)
         self.stride = int(stride)
@@ -216,7 +219,7 @@ class TraceSequenceDataset(Dataset):
         feature_names: tuple[str, ...] | None = None
         for trace in trace_paths:
             rows = read_trace_csv(trace)
-            for row_group in split_rows_by_course(rows):
+            for row_group in split_rows_by_episode(rows):
                 course = str(row_group[0].get("course", "")).strip()
                 if include_course_set is not None and course not in include_course_set:
                     continue
@@ -226,11 +229,21 @@ class TraceSequenceDataset(Dataset):
                 feature_names = names
                 if len(features) < self.sequence_length:
                     continue
-                for start in range(0, len(features) - self.sequence_length + 1, self.stride):
-                    end = start + self.sequence_length
-                    xs.append(features[start:end])
-                    ys.append(targets[end - 1])
-                    sample_row = dict(row_group[end - 1])
+                end_indices = (
+                    range(0, len(features), self.stride)
+                    if pad_start
+                    else range(self.sequence_length - 1, len(features), self.stride)
+                )
+                for end_idx in end_indices:
+                    start = end_idx - self.sequence_length + 1
+                    if start < 0:
+                        prefix = np.repeat(features[[0]], -start, axis=0)
+                        window = np.vstack((prefix, features[0 : end_idx + 1]))
+                    else:
+                        window = features[start : end_idx + 1]
+                    xs.append(window)
+                    ys.append(targets[end_idx])
+                    sample_row = dict(row_group[end_idx])
                     sample_row["_trace_path"] = str(trace)
                     sample_rows.append(sample_row)
 

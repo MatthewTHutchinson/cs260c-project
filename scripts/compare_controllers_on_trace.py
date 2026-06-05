@@ -140,6 +140,8 @@ def write_comparison(
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = (
         "course",
+        "episode_id",
+        "teacher_phase",
         "mode",
         "timestamp_s",
         *[f"teacher_{name}" for name in COMMANDS],
@@ -152,6 +154,8 @@ def write_comparison(
         for row, y_l, y_r, y_t in zip(rows, learned, reactive, teacher):
             out = {
                 "course": row.get("course", ""),
+                "episode_id": row.get("episode_id", ""),
+                "teacher_phase": row.get("teacher_phase", ""),
                 "mode": row.get("mode", ""),
                 "timestamp_s": row.get("timestamp_s", ""),
             }
@@ -196,14 +200,22 @@ def main() -> int:
     reactive_commands: list[np.ndarray] = []
     teacher_commands: list[np.ndarray] = []
     grouped_indices: dict[str, list[int]] = defaultdict(list)
+    grouped_phase_indices: dict[str, list[int]] = defaultdict(list)
+    last_episode_key: tuple[str, str] | None = None
 
     for idx, row in enumerate(rows):
+        episode_key = (row.get("course", ""), row.get("episode_id", ""))
+        if last_episode_key is not None and episode_key != last_episode_key:
+            learned_controller.reset()
+            reactive_controller.reset()
+        last_episode_key = episode_key
         gate = gate_from_row(row)
         telemetry = telemetry_from_row(row)
         learned_commands.append(command_array(learned_controller.compute(gate, telemetry)))
         reactive_commands.append(command_array(reactive_controller.compute(gate, telemetry)))
         teacher_commands.append(np.asarray([as_float(row, key) for key in TEACHER_KEYS], dtype=np.float64))
         grouped_indices[row.get("mode", "unknown") or "unknown"].append(idx)
+        grouped_phase_indices[row.get("teacher_phase", "unknown") or "unknown"].append(idx)
 
     learned = np.vstack(learned_commands)
     reactive = np.vstack(reactive_commands)
@@ -223,6 +235,12 @@ def main() -> int:
         for line in summarize(f"mode={mode} learned_vs_teacher", learned[idxs], teacher[idxs]):
             print(line)
         for line in summarize(f"mode={mode} reactive_vs_teacher", reactive[idxs], teacher[idxs]):
+            print(line)
+    for phase, indices in sorted(grouped_phase_indices.items()):
+        idxs = np.asarray(indices, dtype=np.int64)
+        for line in summarize(f"phase={phase} learned_vs_teacher", learned[idxs], teacher[idxs]):
+            print(line)
+        for line in summarize(f"phase={phase} reactive_vs_teacher", reactive[idxs], teacher[idxs]):
             print(line)
 
     write_comparison(args.out, rows, learned, reactive, teacher)
