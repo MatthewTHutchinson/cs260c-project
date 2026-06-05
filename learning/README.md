@@ -272,6 +272,24 @@ python scripts/audit_policy_predictions.py \
   --plot logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev_s_curve_audit.png
 ```
 
+Compare learned, reactive, and teacher commands before simulator rollout:
+
+```bash
+python scripts/compare_controllers_on_trace.py \
+  --trace logs/privileged_teacher/trace_with_variants.csv \
+  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.pt \
+  --course s_curve \
+  --out logs/controller_comparison/s_curve_no_prev_comparison.csv \
+  --plot logs/controller_comparison/s_curve_no_prev_comparison.png
+```
+
+Current S-curve comparison:
+
+```text
+learned_vs_teacher mse=0.00116282
+reactive_vs_teacher mse=0.17836463
+```
+
 The runtime wrapper lives in `algorithm/learned_controller.py`. It is optional:
 `AutonomousRacingPilot` uses it only when one is supplied and the current gate
 estimate is usable, otherwise the reactive controller handles search/fallback.

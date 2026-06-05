@@ -341,6 +341,16 @@ runtime rollouts. Previous-command features improve teacher-forced offline MSE,
 but without DAgger/closed-loop data they create a train/runtime mismatch because
 the deployed policy feeds back its own previous predictions.
 
+Use `scripts/compare_controllers_on_trace.py` as the last offline gate before
+simulator rollout. On the current S-curve trace, the no-prev-command learned
+checkpoint is much closer to the privileged teacher than the reactive
+controller:
+
+```text
+learned_vs_teacher mse=0.00116282
+reactive_vs_teacher mse=0.17836463
+```
+
 ## Robustness Work
 
 Randomization should be added before trusting learned-policy results:
