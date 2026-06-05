@@ -133,3 +133,8 @@ python -m learning.train_bc \
 
 The loader prefers `teacher_*` target columns when they exist. It does not use
 `world_*` or `teacher_next_gate_*` columns as student inputs.
+
+The current privileged teacher uses a smooth cubic Hermite reference through the
+gate centers and selects a future point on that reference as the lookahead
+target. It is intentionally a stepping stone toward minimum-snap/reference
+trajectory labels, not the deployed competition policy.

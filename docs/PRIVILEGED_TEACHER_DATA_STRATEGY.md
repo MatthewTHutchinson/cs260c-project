@@ -53,17 +53,18 @@ student policy:
 The privileged fields can be logged for teacher construction, but they must be
 excluded from the student feature vector.
 
-## First Teacher To Build
+## Current Teacher
 
-Start with a simple sequence-aware expert before a full aggressive racing
-planner:
+The current scaffold uses a simple sequence-aware expert before a full
+aggressive racing planner:
 
-1. read true drone pose and true gate centers/normals from the local simulator
-2. identify the next gate and one lookahead gate
-3. construct a local corridor target through the center of the next gate
-4. generate a smooth reference segment toward that corridor
-5. convert reference tracking into `RacingCommand` labels
-6. log both the privileged teacher fields and the legal student features
+1. read true debug-course gate centers and gate order
+2. build a smooth cubic Hermite reference through the gate centers
+3. choose a future point on that reference as the lookahead target
+4. derive curvature-aware yaw, lateral/roll, pitch, and thrust labels
+5. log body-frame velocity as a legal telemetry-like student feature
+6. log world pose, world velocity, acceleration, and gate truth as privileged
+   teacher/debug fields only
 
 Initial scaffold:
 
@@ -82,9 +83,14 @@ This produces a debug-course teacher CSV with legal student features,
 privileged columns that are excluded from the current learning feature vector.
 The audit script summarizes bearing/range/command ranges per course and writes
 course-level plots for the path, lookahead targets, bearings, and teacher
-commands.
+commands. It also reports command saturation percentages so aggressive tracks
+like `s_curve` can be distinguished from broken or over-clipped labels.
 
-Once that works, upgrade the reference generator:
+This is not the final trajectory optimizer. It is the first better-than-reactive
+teacher: it flies through gate centers with smooth lookahead and provides labels
+that are much better suited for BC than the current visual-servo controller.
+
+Next, upgrade the reference generator:
 
 ```text
 gate centers/normals
@@ -115,12 +121,12 @@ Teacher-only/debug fields:
 
 ```text
 world pose
-world velocity if privileged
+world velocity and acceleration if privileged
 true next gate ID
 true gate center
 true gate normal
 distance to gate plane
-minimum-snap reference state
+reference trajectory state
 ```
 
 Targets:

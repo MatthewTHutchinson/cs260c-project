@@ -270,7 +270,9 @@ python -m learning.train_bc \
 
 Inspect the audit output before spending GPU time. The useful plots are the
 curved tracks first: `circular_arc_teacher_audit.png` and
-`s_curve_teacher_audit.png`.
+`s_curve_teacher_audit.png`. Also check `command_saturation_pct`; some
+saturation on `s_curve` is acceptable, but saturation on easy/straight tracks is
+a red flag.
 
 ## 6. First Experiment
 

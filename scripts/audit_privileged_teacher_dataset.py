@@ -57,6 +57,13 @@ def percentile(values: np.ndarray, q: float) -> float:
     return float(np.nanpercentile(values, q))
 
 
+def saturation_pct(values: np.ndarray, limit: float, *, atol: float = 1e-6) -> float:
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return float("nan")
+    return float(np.mean(np.abs(finite) >= limit - atol) * 100.0)
+
+
 def summarize_course(course: str, rows: list[dict[str, str]]) -> list[str]:
     bearing_h = np.asarray([as_float(row, "bearing_h_rad") for row in rows], dtype=np.float64)
     distance = np.asarray([as_float(row, "distance_m") for row in rows], dtype=np.float64)
@@ -86,6 +93,14 @@ def summarize_course(course: str, rows: list[dict[str, str]]) -> list[str]:
             f"  lateral_lookahead_delta "
             f"mean_abs={np.nanmean(np.abs(lateral_target_delta)):.3f} "
             f"p95_abs={percentile(np.abs(lateral_target_delta), 95):.3f}"
+        ),
+        (
+            f"  command_saturation_pct "
+            f"roll={saturation_pct(roll, 0.70):.1f} "
+            f"pitch={saturation_pct(pitch, 0.80):.1f} "
+            f"yaw={saturation_pct(yaw, 1.20):.1f} "
+            f"thrust_low={float(np.mean(thrust <= 0.35 + 1e-6) * 100.0):.1f} "
+            f"thrust_high={float(np.mean(thrust >= 0.90 - 1e-6) * 100.0):.1f}"
         ),
     ]
 
@@ -168,4 +183,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
