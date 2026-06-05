@@ -398,6 +398,19 @@ rollouts, compute the desired lookahead/minimum-snap correction from that
 off-line state, and train those labels back onto the same legal FPV/telemetry
 features.
 
+Closed-loop relabeling is now implemented through:
+
+```bash
+scripts/relabel_closed_loop_trace.py
+scripts/audit_closed_loop_signs.py
+```
+
+The first relabel iteration proved the data loop but did not solve the easy
+course. It fit the relabeled failure trace offline (`mse=0.00120523`) but the
+8 s simulator rollout still finished `DNF gates=0/3`, low and far right of the
+gate line. The audit showed roll correction had the right sign, while yaw and
+altitude/thrust recovery still need a better teacher.
+
 ## Robustness Work
 
 Randomization should be added before trusting learned-policy results:

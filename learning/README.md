@@ -339,6 +339,57 @@ laterally, so the next labels should come from closed-loop failure traces with
 privileged debug world position, then relabeled back to the same legal feature
 inputs.
 
+## Closed-Loop Relabeling
+
+Relabel a failed Elodin rollout after applying the debug-world trace patch:
+
+```bash
+python scripts/relabel_closed_loop_trace.py \
+  --trace logs/elodin_learned_relabel_seed/vq1_pinhole/easy/trace.csv \
+  --course easy \
+  --episode-id easy:closed_loop:relabel_seed_001 \
+  --out logs/privileged_teacher/closed_loop_relabels/easy_relabel_seed_001.csv
+
+python scripts/audit_closed_loop_signs.py \
+  --trace logs/elodin_learned_relabel_seed/vq1_pinhole/easy/trace.csv \
+  --course easy
+```
+
+Train with the nominal/augmented teacher plus the relabeled failure episode:
+
+```bash
+python -m learning.train_bc \
+  --traces logs/privileged_teacher/trace_augmented.csv \
+           logs/privileged_teacher/closed_loop_relabels/easy_relabel_seed_001.csv \
+  --exclude-courses s_curve \
+  --epochs 20 \
+  --batch-size 256 \
+  --no-prev-command-features \
+  --out logs/learning_smoke/feature_bc_augmented_plus_relabel_20e_no_prev.pt
+
+python -m learning.export_policy_npz \
+  --checkpoint logs/learning_smoke/feature_bc_augmented_plus_relabel_20e_no_prev.pt \
+  --out logs/learning_smoke/feature_bc_augmented_plus_relabel_20e_no_prev.npz
+```
+
+First relabel iteration, 2026-06-04:
+
+```text
+closed_loop_relabel_rows=383
+offline_relabel_fit learned_vs_teacher mse=0.00120523
+8s_easy_rollout status=DNF gates=0/3
+end_lateral_error_m=13.818540
+mean_thrust=0.547822
+corr_roll_to_abs_error_rate=-0.437697
+corr_yaw_to_abs_error_rate=0.217393
+```
+
+Interpretation: the DAgger loop is wired, and roll is now directionally helpful
+on the audited rollout, but yaw/altitude recovery are still wrong enough that
+the learned controller misses right and flies low. The next relabeling teacher
+should reduce yaw authority during large lateral errors and raise recovery
+thrust/altitude hold before another T4-scale training run.
+
 The runtime wrapper lives in `algorithm/learned_controller.py`. It is optional:
 `AutonomousRacingPilot` uses it only when one is supplied and the current gate
 estimate is usable, otherwise the reactive controller handles search/fallback.
