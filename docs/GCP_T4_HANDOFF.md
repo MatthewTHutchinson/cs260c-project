@@ -250,6 +250,19 @@ python -m learning.train_bc \
   --out checkpoints/feature_bc_local_traces.pt
 ```
 
+Generate and train on the first privileged-teacher debug dataset:
+
+```bash
+python scripts/generate_privileged_teacher_dataset.py \
+  --out logs/privileged_teacher/trace.csv
+
+python -m learning.train_bc \
+  --traces logs/privileged_teacher/trace.csv \
+  --epochs 40 \
+  --batch-size 128 \
+  --out checkpoints/feature_bc_privileged_teacher.pt
+```
+
 ## 6. First Experiment
 
 Goal: prove the model and data plumbing work, not produce a champion racer.

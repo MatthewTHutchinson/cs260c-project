@@ -178,6 +178,10 @@ known debug course geometry
 This gives the learned policy better behavior than cloning the current reactive
 controller alone, especially for circular and S-shaped tracks.
 
+See `docs/PRIVILEGED_TEACHER_DATA_STRATEGY.md` for the explicit training split:
+privileged simulator truth is allowed for teacher/data generation, while the
+student policy consumes only FPV-derived features and allowed telemetry.
+
 ## Architecture
 
 Start compact. There are two architecture levels.
@@ -242,8 +246,13 @@ Add CNN perception when one of these becomes true:
 
 Use two teachers:
 
-1. the current reactive controller for real-time safe behavior
+1. the current reactive controller only for smoke tests and simple safe behavior
 2. a minimum-snap/lookahead expert for smoother curved-track behavior
+
+Do not treat the current local trace CSVs as high-quality demonstrations. They
+are useful for proving the T4 training plumbing, but the teacher still has known
+failure modes: edge/corner chasing, weak lateral displacement handling, and poor
+turn behavior on circular or S-shaped tracks.
 
 Input:
 
@@ -259,7 +268,7 @@ teacher RacingCommand or local target command
 
 Goal:
 
-- learn a stable imitation of the existing controller
+- learn a stable imitation of a better teacher
 - prove the GRU policy can run in the loop
 - do not optimize speed yet
 
@@ -298,12 +307,13 @@ scratch.
 Use the T4 in short, staged jobs:
 
 1. dataset sanity check: train on a tiny log and overfit it
-2. BC baseline: train GRU/MLP on simple-track logs
-3. BC evaluation: run policy on easy/lateral/height/four-gate tracks
-4. DAgger: collect failure states and relabel with teacher
-5. minimum-snap teacher: add curved-track expert labels
-6. PPO: fine-tune only after BC/DAgger completes simple tracks
-7. randomization sweep: evaluate lighting/noise/latency/camera perturbations
+2. current-trace smoke check: verify real CSV columns load and train
+3. teacher upgrade: build sequence-aware/lookahead or minimum-snap labels
+4. BC baseline: train GRU/MLP on upgraded teacher logs
+5. BC evaluation: run policy on easy/lateral/height/four-gate tracks
+6. DAgger: collect failure states and relabel with teacher
+7. PPO: fine-tune only after BC/DAgger completes simple tracks
+8. randomization sweep: evaluate lighting/noise/latency/camera perturbations
 
 Expected cloud use should stay modest if the first policy is feature-based
 instead of raw-image-based.

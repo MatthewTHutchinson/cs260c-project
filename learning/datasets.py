@@ -25,6 +25,12 @@ TARGET_COLUMNS = (
     "yaw_rate_rad_s",
     "thrust_norm",
 )
+TEACHER_TARGET_COLUMNS = (
+    "teacher_roll_rate_rad_s",
+    "teacher_pitch_rate_rad_s",
+    "teacher_yaw_rate_rad_s",
+    "teacher_thrust_norm",
+)
 
 BASE_FEATURE_COLUMNS = (
     "frame_fresh",
@@ -89,6 +95,7 @@ def discover_trace_paths(paths: Iterable[Path]) -> list[Path]:
 class FeatureSpec:
     feature_names: tuple[str, ...]
     target_names: tuple[str, ...] = TARGET_COLUMNS
+    prefer_teacher_targets: bool = True
 
     @classmethod
     def default(cls) -> "FeatureSpec":
@@ -119,7 +126,10 @@ def rows_to_feature_arrays(
     prev_distance = 0.0
 
     for row in rows:
-        target = np.array([_as_float(row.get(name)) for name in spec.target_names], dtype=np.float32)
+        target_names = spec.target_names
+        if spec.prefer_teacher_targets and all(name in row for name in TEACHER_TARGET_COLUMNS):
+            target_names = TEACHER_TARGET_COLUMNS
+        target = np.array([_as_float(row.get(name)) for name in target_names], dtype=np.float32)
         mode = str(row.get("mode", "")).strip().lower()
         distance = _as_float(row.get("distance_m"))
         bearing_h = _as_float(row.get("bearing_h_rad"))
@@ -280,4 +290,3 @@ def make_synthetic_trace(path: Path, *, rows: int = 240) -> Path:
                 }
             )
     return path
-
