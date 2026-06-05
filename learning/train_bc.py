@@ -56,6 +56,8 @@ def main() -> int:
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--val-fraction", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--include-courses", nargs="*", help="Only train on these course names.")
+    parser.add_argument("--exclude-courses", nargs="*", help="Skip these course names.")
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -69,6 +71,8 @@ def main() -> int:
         traces,
         sequence_length=args.sequence_length,
         stride=args.stride,
+        include_courses=args.include_courses,
+        exclude_courses=args.exclude_courses,
     )
     train_idx, val_idx = split_indices(len(dataset), args.val_fraction, args.seed)
     train_base = Subset(dataset, train_idx)
@@ -118,6 +122,8 @@ def main() -> int:
                     "train_samples": len(train_data),
                     "val_samples": len(val_data),
                     "best_val_mse": best_val,
+                    "include_courses": args.include_courses or [],
+                    "exclude_courses": args.exclude_courses or [],
                 },
             )
 
@@ -128,4 +134,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

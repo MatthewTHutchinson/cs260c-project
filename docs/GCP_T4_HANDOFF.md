@@ -271,6 +271,38 @@ python -m learning.eval_policy \
   --checkpoint checkpoints/feature_bc_privileged_teacher.pt \
   --traces logs/privileged_teacher/trace.csv \
   --predictions-out logs/learning_smoke/feature_bc_privileged_teacher_predictions.csv
+
+python -m learning.train_bc \
+  --traces logs/privileged_teacher/trace.csv \
+  --exclude-courses s_curve \
+  --epochs 20 \
+  --batch-size 128 \
+  --out logs/learning_smoke/feature_bc_leave_s_curve_out_20e.pt
+
+python -m learning.eval_policy \
+  --checkpoint logs/learning_smoke/feature_bc_leave_s_curve_out_20e.pt \
+  --traces logs/privileged_teacher/trace.csv \
+  --include-courses s_curve \
+  --predictions-out logs/learning_smoke/feature_bc_leave_s_curve_out_20e_s_curve_predictions.csv
+
+python scripts/generate_privileged_teacher_dataset.py \
+  --out logs/privileged_teacher/trace_with_variants.csv \
+  --random-s-curve-variants 12 \
+  --random-arc-variants 8 \
+  --random-seed 11
+
+python -m learning.train_bc \
+  --traces logs/privileged_teacher/trace_with_variants.csv \
+  --exclude-courses s_curve \
+  --epochs 20 \
+  --batch-size 256 \
+  --out logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e.pt
+
+python -m learning.eval_policy \
+  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e.pt \
+  --traces logs/privileged_teacher/trace_with_variants.csv \
+  --include-courses s_curve \
+  --predictions-out logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_s_curve_predictions.csv
 ```
 
 Inspect the audit output before spending GPU time. The useful plots are the
@@ -282,11 +314,17 @@ a red flag.
 Expected local baseline from a 20-epoch smoke run:
 
 ```text
-overall mse=0.00043017
-easy mse=0.00003066
-circular_arc mse=0.00036189
-s_curve mse=0.00123746
+overall mse=0.00044975
+easy mse=0.00004778
+circular_arc mse=0.00039825
+s_curve mse=0.00130725
+leave-s_curve-out eval on s_curve mse=0.16744989
+leave-s_curve-out with randomized variants mse=0.00024772
 ```
+
+The held-out S-curve result is intentionally harsh. It means the current
+base teacher dataset is learnable but too narrow for shape generalization.
+Randomized S/arc variants fix that first generalization failure.
 
 ## 6. First Experiment
 

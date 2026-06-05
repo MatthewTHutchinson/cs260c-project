@@ -106,13 +106,20 @@ def main() -> int:
     parser.add_argument("--traces", type=Path, nargs="+", required=True)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--predictions-out", type=Path)
+    parser.add_argument("--include-courses", nargs="*", help="Only evaluate these course names.")
+    parser.add_argument("--exclude-courses", nargs="*", help="Skip these course names.")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, payload = load_checkpoint(str(args.checkpoint), map_location=device)
     model.to(device)
     sequence_length = int(payload.get("metadata", {}).get("sequence_length", 12))
-    dataset = TraceSequenceDataset(args.traces, sequence_length=sequence_length)
+    dataset = TraceSequenceDataset(
+        args.traces,
+        sequence_length=sequence_length,
+        include_courses=args.include_courses,
+        exclude_courses=args.exclude_courses,
+    )
     data = NormalizedDataset(dataset, payload["feature_mean"], payload["feature_std"])
     loader = DataLoader(data, batch_size=args.batch_size)
     loss_fn = nn.MSELoss(reduction="sum")

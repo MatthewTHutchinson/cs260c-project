@@ -140,6 +140,50 @@ python -m learning.eval_policy \
   --predictions-out logs/learning_smoke/feature_bc_privileged_teacher_predictions.csv
 ```
 
+Train/evaluate a held-out course split:
+
+```bash
+python -m learning.train_bc \
+  --traces logs/privileged_teacher/trace.csv \
+  --exclude-courses s_curve \
+  --epochs 20 \
+  --batch-size 128 \
+  --out logs/learning_smoke/feature_bc_leave_s_curve_out_20e.pt
+
+python -m learning.eval_policy \
+  --checkpoint logs/learning_smoke/feature_bc_leave_s_curve_out_20e.pt \
+  --traces logs/privileged_teacher/trace.csv \
+  --include-courses s_curve \
+  --predictions-out logs/learning_smoke/feature_bc_leave_s_curve_out_20e_s_curve_predictions.csv
+```
+
+Generate randomized curved/S-shaped teacher variants:
+
+```bash
+python scripts/generate_privileged_teacher_dataset.py \
+  --out logs/privileged_teacher/trace_with_variants.csv \
+  --random-s-curve-variants 12 \
+  --random-arc-variants 8 \
+  --random-seed 11
+```
+
+Train on those variants while still holding out the canonical `s_curve`:
+
+```bash
+python -m learning.train_bc \
+  --traces logs/privileged_teacher/trace_with_variants.csv \
+  --exclude-courses s_curve \
+  --epochs 20 \
+  --batch-size 256 \
+  --out logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e.pt
+
+python -m learning.eval_policy \
+  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e.pt \
+  --traces logs/privileged_teacher/trace_with_variants.csv \
+  --include-courses s_curve \
+  --predictions-out logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_s_curve_predictions.csv
+```
+
 The loader prefers `teacher_*` target columns when they exist. It does not use
 `world_*` or `teacher_next_gate_*` columns as student inputs.
 
@@ -151,11 +195,28 @@ trajectory labels, not the deployed competition policy.
 Current local 20-epoch smoke result, 2026-06-05:
 
 ```text
-overall mse=0.00043017
-easy mse=0.00003066
-circular_arc mse=0.00036189
-s_curve mse=0.00123746
+overall mse=0.00044975
+easy mse=0.00004778
+circular_arc mse=0.00039825
+s_curve mse=0.00130725
 ```
 
-The S-curve should remain the hardest course. If easy/straight errors are high,
-debug the learning plumbing before increasing model complexity.
+Current leave-`s_curve`-out result:
+
+```text
+s_curve held-out mse=0.16744989
+mae_yaw_rate=0.52123985
+```
+
+Current leave-`s_curve`-out result after adding 12 randomized S-curve variants
+and 8 randomized arc variants:
+
+```text
+s_curve held-out mse=0.00024772
+mae_yaw_rate=0.01774498
+```
+
+The model can fit the upgraded teacher when S-curve examples are included, but
+it does not generalize to S-curves from straight/soft-curve examples alone.
+Randomized curved teacher data fixes the first generalization failure much more
+effectively than simply increasing model complexity.

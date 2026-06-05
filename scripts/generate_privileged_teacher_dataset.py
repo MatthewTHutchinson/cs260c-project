@@ -188,6 +188,62 @@ def bearing_to_gate(
     return bearing_h, bearing_v_camera, distance, lateral, vertical
 
 
+def gate_yaws_from_centers(centers: list[tuple[float, float, float]]) -> list[float]:
+    yaws: list[float] = []
+    for idx, center in enumerate(centers):
+        if idx < len(centers) - 1:
+            nxt = centers[idx + 1]
+            dx = nxt[0] - center[0]
+            dy = nxt[1] - center[1]
+        else:
+            prev = centers[idx - 1]
+            dx = center[0] - prev[0]
+            dy = center[1] - prev[1]
+        yaws.append(math.degrees(math.atan2(dy, max(1e-6, dx))))
+    return yaws
+
+
+def randomized_s_curve(index: int, rng: np.random.Generator) -> tuple[str, tuple[CourseGate, ...]]:
+    gate_count = int(rng.integers(5, 7))
+    spacing = float(rng.uniform(6.5, 9.0))
+    amplitude = float(rng.uniform(0.9, 2.4))
+    phase = float(rng.uniform(-0.35, 0.35))
+    centers: list[tuple[float, float, float]] = []
+    for gate_idx in range(gate_count):
+        x = 10.0 + gate_idx * spacing
+        sign = -1.0 if gate_idx % 2 == 0 else 1.0
+        if gate_idx == 0:
+            y = float(rng.uniform(-0.25, 0.25))
+        else:
+            y = sign * amplitude * float(rng.uniform(0.75, 1.15)) + phase
+        z = 1.8 + float(rng.uniform(-0.18, 0.18))
+        centers.append((x, y, z))
+    yaws = gate_yaws_from_centers(centers)
+    gates = tuple(
+        CourseGate(gate_idx, center, yaw_deg=yaws[gate_idx])
+        for gate_idx, center in enumerate(centers)
+    )
+    return f"s_curve_rand_{index:03d}", gates
+
+
+def randomized_arc(index: int, rng: np.random.Generator) -> tuple[str, tuple[CourseGate, ...]]:
+    gate_count = int(rng.integers(4, 6))
+    spacing = float(rng.uniform(7.0, 9.0))
+    curvature = float(rng.uniform(0.45, 1.20)) * float(rng.choice([-1.0, 1.0]))
+    centers: list[tuple[float, float, float]] = []
+    for gate_idx in range(gate_count):
+        x = 10.0 + gate_idx * spacing
+        y = curvature * gate_idx * gate_idx * 0.45 + float(rng.uniform(-0.18, 0.18))
+        z = 1.8 + float(rng.uniform(-0.15, 0.15))
+        centers.append((x, y, z))
+    yaws = gate_yaws_from_centers(centers)
+    gates = tuple(
+        CourseGate(gate_idx, center, yaw_deg=yaws[gate_idx])
+        for gate_idx, center in enumerate(centers)
+    )
+    return f"arc_rand_{index:03d}", gates
+
+
 def generate_rows(
     *,
     course_name: str,
@@ -374,14 +430,27 @@ def main() -> int:
     parser.add_argument("--speed-m-s", type=float, default=6.0)
     parser.add_argument("--lookahead-m", type=float, default=5.0)
     parser.add_argument("--camera-tilt-up-deg", type=float, default=20.0)
+    parser.add_argument("--random-s-curve-variants", type=int, default=0)
+    parser.add_argument("--random-arc-variants", type=int, default=0)
+    parser.add_argument("--random-seed", type=int, default=7)
     args = parser.parse_args()
 
     all_rows: list[dict[str, str]] = []
-    for course_name in [c.strip() for c in args.courses.split(",") if c.strip()]:
+    course_specs: list[tuple[str, tuple[CourseGate, ...]]] = [
+        (course_name, course_by_name(course_name))
+        for course_name in [c.strip() for c in args.courses.split(",") if c.strip()]
+    ]
+    rng = np.random.default_rng(args.random_seed)
+    for i in range(args.random_s_curve_variants):
+        course_specs.append(randomized_s_curve(i, rng))
+    for i in range(args.random_arc_variants):
+        course_specs.append(randomized_arc(i, rng))
+
+    for course_name, gates in course_specs:
         all_rows.extend(
             generate_rows(
                 course_name=course_name,
-                gates=course_by_name(course_name),
+                gates=gates,
                 samples_per_segment=args.samples_per_segment,
                 speed_m_s=args.speed_m_s,
                 lookahead_m=args.lookahead_m,
@@ -397,6 +466,11 @@ def main() -> int:
 
     print(f"dataset={args.out}")
     print(f"rows={len(all_rows)}")
+    print(f"courses={len(course_specs)}")
+    print(
+        "randomized_courses="
+        f"s_curve={args.random_s_curve_variants} arc={args.random_arc_variants}"
+    )
     print("student_inputs=FPV-derived features, tracker-like mode/history, telemetry")
     print("privileged_fields=teacher_* and world_* columns; do not feed to deployed policy")
     return 0

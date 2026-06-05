@@ -91,6 +91,34 @@ def discover_trace_paths(paths: Iterable[Path]) -> list[Path]:
     return out
 
 
+def parse_course_filter(values: Iterable[str] | None) -> set[str] | None:
+    if not values:
+        return None
+    courses: set[str] = set()
+    for value in values:
+        for part in str(value).split(","):
+            course = part.strip()
+            if course:
+                courses.add(course)
+    return courses or None
+
+
+def split_rows_by_course(rows: list[dict[str, str]]) -> list[list[dict[str, str]]]:
+    groups: list[list[dict[str, str]]] = []
+    current: list[dict[str, str]] = []
+    current_course: str | None = None
+    for row in rows:
+        course = str(row.get("course", "")).strip()
+        if current and course != current_course:
+            groups.append(current)
+            current = []
+        current.append(row)
+        current_course = course
+    if current:
+        groups.append(current)
+    return groups
+
+
 @dataclass(frozen=True)
 class FeatureSpec:
     feature_names: tuple[str, ...]
@@ -168,6 +196,8 @@ class TraceSequenceDataset(Dataset):
         sequence_length: int = 12,
         stride: int = 1,
         spec: FeatureSpec | None = None,
+        include_courses: Iterable[str] | None = None,
+        exclude_courses: Iterable[str] | None = None,
     ) -> None:
         self.sequence_length = int(sequence_length)
         self.stride = int(stride)
@@ -175,6 +205,8 @@ class TraceSequenceDataset(Dataset):
             raise ValueError("sequence_length must be >= 1")
         if self.stride < 1:
             raise ValueError("stride must be >= 1")
+        include_course_set = parse_course_filter(include_courses)
+        exclude_course_set = parse_course_filter(exclude_courses)
 
         trace_paths = discover_trace_paths(traces)
         xs: list[np.ndarray] = []
@@ -183,17 +215,23 @@ class TraceSequenceDataset(Dataset):
         feature_names: tuple[str, ...] | None = None
         for trace in trace_paths:
             rows = read_trace_csv(trace)
-            features, targets, names = rows_to_feature_arrays(rows, spec)
-            feature_names = names
-            if len(features) < self.sequence_length:
-                continue
-            for start in range(0, len(features) - self.sequence_length + 1, self.stride):
-                end = start + self.sequence_length
-                xs.append(features[start:end])
-                ys.append(targets[end - 1])
-                sample_row = dict(rows[end - 1])
-                sample_row["_trace_path"] = str(trace)
-                sample_rows.append(sample_row)
+            for row_group in split_rows_by_course(rows):
+                course = str(row_group[0].get("course", "")).strip()
+                if include_course_set is not None and course not in include_course_set:
+                    continue
+                if exclude_course_set is not None and course in exclude_course_set:
+                    continue
+                features, targets, names = rows_to_feature_arrays(row_group, spec)
+                feature_names = names
+                if len(features) < self.sequence_length:
+                    continue
+                for start in range(0, len(features) - self.sequence_length + 1, self.stride):
+                    end = start + self.sequence_length
+                    xs.append(features[start:end])
+                    ys.append(targets[end - 1])
+                    sample_row = dict(row_group[end - 1])
+                    sample_row["_trace_path"] = str(trace)
+                    sample_rows.append(sample_row)
 
         if not xs:
             raise ValueError("no sequence samples were created from the provided traces")

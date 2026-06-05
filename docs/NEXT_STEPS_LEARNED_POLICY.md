@@ -323,6 +323,12 @@ per-course, and per-mode errors, plus prediction-vs-target saturation
 percentages so curved-track failures are visible instead of hidden in aggregate
 MSE.
 
+Use `--exclude-courses` during training and `--include-courses` during
+evaluation for leave-one-course-out checks. The current leave-`s_curve`-out
+result fails badly on the base dataset, but improves after adding randomized
+curved and S-shaped teacher courses. That makes dataset diversity the next
+primary lever before simply scaling the model.
+
 ## Robustness Work
 
 Randomization should be added before trusting learned-policy results:
