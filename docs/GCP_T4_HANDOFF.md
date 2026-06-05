@@ -5,6 +5,18 @@ Date: 2026-06-04
 Purpose: use the GCP T4 machine for compact training experiments, not for
 official Windows-simulator bring-up.
 
+Current machine snapshot from diagnostics:
+
+- Ubuntu 22.04.5 LTS
+- 4 vCPU
+- 14 GiB RAM
+- ~146 GiB free disk on `/`
+- Tesla T4 with 15360 MiB VRAM
+- NVIDIA driver 580.126.20
+- CUDA 12.9 toolkit visible via `nvcc`
+- base Python is 3.13.13
+- PyTorch 2.12.0+cu130 sees the GPU successfully
+
 Near-term learning direction:
 
 ```text
@@ -119,11 +131,25 @@ git log --oneline -5
 
 ## 3. Python Environment
 
-Use a venv unless the VM already has a clean conda environment.
+Use a separate conda env or venv for the project. Do not rely on the base
+Python 3.13 environment for the training stack unless every dependency is
+verified against it.
+
+Recommended choice: a fresh Python 3.11 environment.
+
+Using conda:
 
 ```bash
-cd ~/dev/cs260c-project
-python3 -m venv .venv
+conda create -n cs260c-t4 python=3.11 -y
+conda activate cs260c-t4
+python -m pip install --upgrade pip wheel setuptools
+python -m pip install -r requirements.txt
+```
+
+Using venv:
+
+```bash
+python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip wheel setuptools
 python -m pip install -r requirements.txt
@@ -148,6 +174,9 @@ PY
 
 If CUDA is not available, stop and inspect the diagnostics before spending more
 cloud time.
+
+If Python 3.11 is not available, install it first or use conda rather than the
+base 3.13 interpreter.
 
 ## 4. Local Repo Smoke Tests On T4
 
@@ -256,4 +285,3 @@ python -m py_compile algorithm/*.py scripts/*.py learning/*.py
 Run a 1-2 minute smoke test first. Then run the longer job.
 
 Stop the VM when done.
-
