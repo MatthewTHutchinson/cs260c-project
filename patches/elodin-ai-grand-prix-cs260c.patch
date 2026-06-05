@@ -1709,7 +1709,7 @@ new file mode 100644
 index 0000000..c3cee00
 --- /dev/null
 +++ b/solver/cs260c_pilot.py
-@@ -0,0 +1,317 @@
+@@ -0,0 +1,332 @@
 +"""CS 260C perception-guided racing pilot for the Elodin harness.
 +
 +This solver deliberately ignores Elodin's world pose. It consumes only the FPV
@@ -1760,6 +1760,20 @@ index 0000000..c3cee00
 +    profile = get_camera_profile()
 +    detector_config = detector_config_from_env(camera_profile=profile.name)
 +    tracker = build_gate_tracker(detector_config)
++    learned_controller = None
++    learned_checkpoint = os.environ.get("CS260C_LEARNED_CONTROLLER_CHECKPOINT")
++    if learned_checkpoint:
++        from algorithm.learned_controller import LearnedFeatureController  # noqa: WPS433
++
++        learned_device = os.environ.get("CS260C_LEARNED_CONTROLLER_DEVICE", "cpu")
++        learned_controller = LearnedFeatureController(
++            Path(learned_checkpoint).expanduser(),
++            device=learned_device,
++        )
++        print(
++            "[CS260C] learned controller: "
++            f"checkpoint={learned_checkpoint} device={learned_device}"
++        )
 +    controller = ReactiveGateController(
 +        ReactiveControllerGains(
 +            camera_tilt_up_rad=math.radians(profile.tilt_up_deg),
@@ -1779,6 +1793,7 @@ index 0000000..c3cee00
 +    return AutonomousRacingPilot(
 +        tracker=tracker,
 +        controller=controller,
++        learned_controller=learned_controller,
 +        frame_format="rgb",
 +    )
 +

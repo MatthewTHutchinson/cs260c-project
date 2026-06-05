@@ -351,6 +351,36 @@ learned_vs_teacher mse=0.00116282
 reactive_vs_teacher mse=0.17836463
 ```
 
+The Elodin rollout path is:
+
+```bash
+scripts/run_elodin_learned_suite.sh
+```
+
+It defaults to the exported `.npz` checkpoint so the sibling Elodin runtime does
+not need `torch` installed. It sets `CS260C_LEARNED_CONTROLLER_CHECKPOINT` for
+the sibling solver and keeps reactive fallback enabled for search/lost-gate
+states.
+
+First closed-loop smoke result, 2026-06-04:
+
+```text
+course=easy
+sim_time=4.0s
+status=DNF
+gates_passed=0/3
+trace_rows=178
+modes={'detected': 178}
+```
+
+This is still useful progress: the learned controller is now running in the
+simulator loop, but the rollout shows why the current CSVs are smoke tests only.
+The policy enters learned mode during the takeoff/transient phase, commands
+near-minimum thrust, and accumulates lateral velocity before gate 1. Do not
+spend more T4 time scaling the model until the teacher labels include launch
+guards, off-nominal lateral recovery, and closed-loop-like deviations from the
+centerline.
+
 ## Robustness Work
 
 Randomization should be added before trusting learned-policy results:

@@ -150,6 +150,26 @@ Run it with:
 RACE_SOLVER=solver.cs260c_pilot elodin editor sim/main.py
 ```
 
+The reactive controller remains the default. To enable the learned
+feature-policy controller, first export the PyTorch checkpoint to a pure NumPy
+runtime artifact before running inside Elodin's Python environment:
+
+```bash
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m learning.export_policy_npz \
+  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.pt \
+  --out logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.npz
+```
+
+Then enable the learned feature-policy controller with:
+
+```bash
+CS260C_LEARNED_CONTROLLER_CHECKPOINT=/Users/matthewhutchinson/dev/cs260c-project/logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.npz
+CS260C_LEARNED_CONTROLLER_DEVICE=cpu
+```
+
+The solver still keeps reactive search/lost-gate fallback active through
+`AutonomousRacingPilot`.
+
 ## Local Bring-Up Status
 
 Completed on 2026-05-31:
@@ -182,6 +202,29 @@ scripts/run_elodin_smoke.sh
 ```
 
 That wrapper uses an inline Betaflight subprocess from the Elodin harness instead of the normal `elodin run` s10 handoff. It is the right command for checking that physics, Betaflight lockstep, RC commands, and our solver adapter are wired together.
+
+Learned-controller rollout wrapper:
+
+```bash
+scripts/run_elodin_learned_suite.sh
+```
+
+Default learned rollout settings:
+
+```text
+checkpoint=logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.npz
+courses=easy,lateral_soft,low_high,four_gate_straight,circular_arc,s_curve
+out_dir=logs/elodin_learned_suite
+```
+
+Override with:
+
+```bash
+CS260C_LEARNED_CONTROLLER_CHECKPOINT=/path/to/checkpoint.npz \
+ELODIN_LEARNED_COURSES=s_curve \
+ELODIN_LEARNED_SIM_TIME=18 \
+scripts/run_elodin_learned_suite.sh
+```
 
 The full FPV/render/editor path is separate. Do not enable FPV in `scripts/run_elodin_smoke.sh`; direct inline mode can hang at the first render request because there is no editor/render-server lifecycle. Use the Elodin editor command for visual gate-recognition inspection:
 

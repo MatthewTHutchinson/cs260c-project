@@ -11,11 +11,40 @@ from collections import deque
 from pathlib import Path
 
 import numpy as np
-import torch
 
 from algorithm.types import GateEstimate, RacingCommand, TrackMode, VehicleTelemetry
-from learning.datasets import FeatureSpec, MODE_NAMES, TARGET_COLUMNS
-from learning.feature_policy import load_checkpoint
+
+
+MODE_NAMES = ("search", "tracked", "detected", "commit", "recover")
+TARGET_COLUMNS = (
+    "roll_rate_rad_s",
+    "pitch_rate_rad_s",
+    "yaw_rate_rad_s",
+    "thrust_norm",
+)
+DEFAULT_FEATURE_NAMES = (
+    "frame_fresh",
+    "last_gate_passed",
+    "next_gate_index",
+    "body_forward_elevation_rad",
+    "body_vx_m_s",
+    "body_vy_m_s",
+    "body_vz_m_s",
+    "confidence",
+    "bearing_h_rad",
+    "bearing_v_rad",
+    "distance_m",
+    "pixel_x",
+    "pixel_y",
+    "apparent_size_px",
+    "gate_age_s",
+    *[f"mode_{mode}" for mode in MODE_NAMES],
+    *[f"prev_{name}" for name in TARGET_COLUMNS],
+    "bearing_h_delta",
+    "bearing_v_delta",
+    "distance_delta",
+    "has_distance",
+)
 
 
 class LearnedFeatureController:
@@ -25,23 +54,19 @@ class LearnedFeatureController:
         self,
         checkpoint: str | Path,
         *,
-        device: str | torch.device = "cpu",
+        device: str = "cpu",
         max_roll_rate_rad_s: float = 0.70,
         max_pitch_rate_rad_s: float = 0.80,
         max_yaw_rate_rad_s: float = 1.20,
         min_thrust_norm: float = 0.30,
         max_thrust_norm: float = 0.95,
     ) -> None:
-        self.device = torch.device(device)
-        self.model, self.payload = load_checkpoint(str(checkpoint), map_location=self.device)
-        self.model.to(self.device)
-        self.model.eval()
-        self.feature_names = tuple(self.payload.get("feature_names", FeatureSpec.default().feature_names))
-        self.sequence_length = int(self.payload.get("metadata", {}).get("sequence_length", 12))
-        self.mean = self.payload["feature_mean"].to(self.device).float()
-        self.std = self.payload["feature_std"].to(self.device).float()
-        self.active_features = self.std >= 1e-6
-        self.safe_std = torch.where(self.active_features, self.std, torch.ones_like(self.std))
+        self.checkpoint = Path(checkpoint)
+        self.device = str(device)
+        if self.checkpoint.suffix == ".npz":
+            self._load_npz(self.checkpoint)
+        else:
+            self._load_torch(self.checkpoint)
         self.max_roll_rate_rad_s = float(max_roll_rate_rad_s)
         self.max_pitch_rate_rad_s = float(max_pitch_rate_rad_s)
         self.max_yaw_rate_rad_s = float(max_yaw_rate_rad_s)
@@ -52,6 +77,43 @@ class LearnedFeatureController:
         self._prev_bearing_h = 0.0
         self._prev_bearing_v = 0.0
         self._prev_distance = 0.0
+
+    def _load_npz(self, checkpoint: Path) -> None:
+        payload = np.load(checkpoint, allow_pickle=False)
+        self.runtime = "numpy"
+        self.feature_names = tuple(str(x) for x in payload["feature_names"].tolist())
+        self.sequence_length = int(payload["sequence_length"])
+        self.mean = payload["feature_mean"].astype(np.float32)
+        self.std = payload["feature_std"].astype(np.float32)
+        self.active_features = self.std >= 1e-6
+        self.safe_std = np.where(self.active_features, self.std, 1.0).astype(np.float32)
+        self.gru_weight_ih = payload["gru_weight_ih"].astype(np.float32)
+        self.gru_weight_hh = payload["gru_weight_hh"].astype(np.float32)
+        self.gru_bias_ih = payload["gru_bias_ih"].astype(np.float32)
+        self.gru_bias_hh = payload["gru_bias_hh"].astype(np.float32)
+        self.ln_weight = payload["ln_weight"].astype(np.float32)
+        self.ln_bias = payload["ln_bias"].astype(np.float32)
+        self.head1_weight = payload["head1_weight"].astype(np.float32)
+        self.head1_bias = payload["head1_bias"].astype(np.float32)
+        self.head2_weight = payload["head2_weight"].astype(np.float32)
+        self.head2_bias = payload["head2_bias"].astype(np.float32)
+
+    def _load_torch(self, checkpoint: Path) -> None:
+        import torch
+        from learning.feature_policy import load_checkpoint
+
+        self.torch = torch
+        self.torch_device = torch.device(self.device)
+        self.model, self.payload = load_checkpoint(str(checkpoint), map_location=self.torch_device)
+        self.model.to(self.torch_device)
+        self.model.eval()
+        self.runtime = "torch"
+        self.feature_names = tuple(self.payload.get("feature_names", DEFAULT_FEATURE_NAMES))
+        self.sequence_length = int(self.payload.get("metadata", {}).get("sequence_length", 12))
+        self.mean = self.payload["feature_mean"].to(self.torch_device).float()
+        self.std = self.payload["feature_std"].to(self.torch_device).float()
+        self.active_features = self.std >= 1e-6
+        self.safe_std = torch.where(self.active_features, self.std, torch.ones_like(self.std))
 
     def reset(self) -> None:
         self._history.clear()
@@ -71,12 +133,18 @@ class LearnedFeatureController:
         while len(self._history) < self.sequence_length:
             self._history.appendleft(feature.copy())
 
-        x = torch.from_numpy(np.stack(tuple(self._history)).astype(np.float32))
-        x = x.unsqueeze(0).to(self.device)
-        x = (x - self.mean) / self.safe_std
-        x = torch.where(self.active_features, x, torch.zeros_like(x))
-        with torch.no_grad():
-            y = self.model(x).squeeze(0).detach().cpu().numpy()
+        x_np = np.stack(tuple(self._history)).astype(np.float32)
+        if self.runtime == "numpy":
+            x_np = (x_np - self.mean) / self.safe_std
+            x_np = np.where(self.active_features, x_np, 0.0).astype(np.float32)
+            y = self._numpy_forward(x_np)
+        else:
+            torch = self.torch
+            x = torch.from_numpy(x_np).unsqueeze(0).to(self.torch_device)
+            x = (x - self.mean) / self.safe_std
+            x = torch.where(self.active_features, x, torch.zeros_like(x))
+            with torch.no_grad():
+                y = self.model(x).squeeze(0).detach().cpu().numpy()
 
         command = RacingCommand(
             roll_rate_rad_s=float(y[0]),
@@ -96,6 +164,36 @@ class LearnedFeatureController:
         self._prev_bearing_v = float(gate.bearing_v_rad)
         self._prev_distance = float(gate.distance_m or 0.0)
         return command
+
+    def _numpy_forward(self, x: np.ndarray) -> np.ndarray:
+        hidden_dim = self.gru_weight_hh.shape[1]
+        h = np.zeros(hidden_dim, dtype=np.float32)
+        w_ir, w_iz, w_in = np.split(self.gru_weight_ih, 3, axis=0)
+        w_hr, w_hz, w_hn = np.split(self.gru_weight_hh, 3, axis=0)
+        b_ir, b_iz, b_in = np.split(self.gru_bias_ih, 3)
+        b_hr, b_hz, b_hn = np.split(self.gru_bias_hh, 3)
+        for xt in x:
+            r = self._sigmoid(w_ir @ xt + b_ir + w_hr @ h + b_hr)
+            z = self._sigmoid(w_iz @ xt + b_iz + w_hz @ h + b_hz)
+            n = np.tanh(w_in @ xt + b_in + r * (w_hn @ h + b_hn))
+            h = (1.0 - z) * n + z * h
+
+        h = self._layer_norm(h)
+        h = self._silu(self.head1_weight @ h + self.head1_bias)
+        return self.head2_weight @ h + self.head2_bias
+
+    def _layer_norm(self, x: np.ndarray, eps: float = 1e-5) -> np.ndarray:
+        mean = np.mean(x)
+        var = np.mean((x - mean) ** 2)
+        return (x - mean) / np.sqrt(var + eps) * self.ln_weight + self.ln_bias
+
+    @staticmethod
+    def _sigmoid(x: np.ndarray) -> np.ndarray:
+        return 1.0 / (1.0 + np.exp(-x))
+
+    @staticmethod
+    def _silu(x: np.ndarray) -> np.ndarray:
+        return x / (1.0 + np.exp(-x))
 
     def _feature_vector(
         self,

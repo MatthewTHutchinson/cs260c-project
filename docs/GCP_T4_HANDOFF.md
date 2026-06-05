@@ -305,12 +305,16 @@ python -m learning.eval_policy \
   --include-courses s_curve \
   --predictions-out logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev_s_curve_predictions.csv
 
+python -m learning.export_policy_npz \
+  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.pt \
+  --out logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.npz
+
 python scripts/audit_policy_predictions.py \
   --predictions logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev_s_curve_predictions.csv \
   --plot logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev_s_curve_audit.png
 
 python scripts/smoke_learned_controller.py \
-  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.pt \
+  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.npz \
   --trace logs/privileged_teacher/trace_with_variants.csv \
   --course s_curve \
   --rows 24

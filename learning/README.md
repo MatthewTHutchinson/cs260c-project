@@ -185,6 +185,15 @@ python -m learning.eval_policy \
   --predictions-out logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev_s_curve_predictions.csv
 ```
 
+Export that checkpoint to a pure NumPy runtime artifact before deploying it in
+the simulator harness:
+
+```bash
+python -m learning.export_policy_npz \
+  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.pt \
+  --out logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.npz
+```
+
 The older teacher-forced version is useful for comparison, but should not be
 the first runtime checkpoint:
 
@@ -258,7 +267,7 @@ package and converted into a clipped `RacingCommand`:
 
 ```bash
 python scripts/smoke_learned_controller.py \
-  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.pt \
+  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.npz \
   --trace logs/privileged_teacher/trace_with_variants.csv \
   --course s_curve \
   --rows 24
@@ -277,10 +286,10 @@ Compare learned, reactive, and teacher commands before simulator rollout:
 ```bash
 python scripts/compare_controllers_on_trace.py \
   --trace logs/privileged_teacher/trace_with_variants.csv \
-  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.pt \
+  --checkpoint logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev.npz \
   --course s_curve \
-  --out logs/controller_comparison/s_curve_no_prev_comparison.csv \
-  --plot logs/controller_comparison/s_curve_no_prev_comparison.png
+  --out logs/controller_comparison/s_curve_no_prev_npz_comparison.csv \
+  --plot logs/controller_comparison/s_curve_no_prev_npz_comparison.png
 ```
 
 Current S-curve comparison:

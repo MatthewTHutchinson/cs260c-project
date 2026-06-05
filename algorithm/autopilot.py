@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import time
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 
 from algorithm.detector_factory import build_gate_tracker
 from algorithm.gate_tracker import GateTracker
-from algorithm.learned_controller import LearnedFeatureController
 from algorithm.reactive_controller import ReactiveGateController
 from algorithm.types import GateEstimate, RacingCommand, VehicleTelemetry
+
+if TYPE_CHECKING:
+    from algorithm.learned_controller import LearnedFeatureController
 
 
 class AutonomousRacingPilot:
