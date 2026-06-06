@@ -367,6 +367,43 @@ distribution itself: richer off-corridor states, smoother high-authority labels,
 and a trajectory/reference that explains how to rejoin the gate line before
 commit.
 
+Recovery rejoin-teacher follow-up, 2026-06-06:
+
+```bash
+RECOVERY_TEACHER=rejoin \
+TRACE=logs/privileged_teacher/trace_augmented_rejoin.csv \
+CHECKPOINT=logs/learning_smoke/feature_bc_augmented_rejoin_no_prev_no_seq_leave_s_curve_out_20e.pt \
+NPZ=logs/learning_smoke/feature_bc_augmented_rejoin_no_prev_no_seq_leave_s_curve_out_20e.npz \
+PREDICTIONS=logs/learning_smoke/feature_bc_augmented_rejoin_no_prev_no_seq_leave_s_curve_out_20e_s_curve_predictions.csv \
+COMPARISON=logs/controller_comparison/s_curve_rejoin_no_prev_no_seq_npz_comparison.csv \
+scripts/run_feature_policy_ablation.sh
+```
+
+```text
+recovery_teacher=rejoin
+best_val_mse=0.00244467
+heldout_s_curve_mse=0.00185871
+heldout_s_curve_mae_yaw_rate=0.05335076
+comparison_s_curve learned_vs_teacher mse=0.00173593
+comparison_s_curve reactive_vs_teacher mse=0.14797705
+phase=launch learned_vs_teacher mse=0.00016332
+phase=nominal learned_vs_teacher mse=0.00114335
+phase=off_nominal learned_vs_teacher mse=0.00490683
+runtime smoke thrust_norm=0.698098
+```
+
+This is the best offline learning result so far for the deployable
+no-previous-command / no-sequence-feature policy. The improvement came from
+changing the recovery teacher, not changing the model. The `rejoin` teacher
+labels off-corridor states with a local path-rejoin target, slower forward
+pitch, lateral/yaw correction, and altitude hold before gate commit.
+
+Important caveat: this still is not closed-loop simulator success. It shows that
+a better-shaped recovery reference produces labels the GRU can imitate on the
+held-out canonical S-curve. The next validation step is closed-loop rollout in
+the available local simulator, or, if time is too short, using these offline
+metrics and comparison plots as the final-project evidence.
+
 The model can fit the upgraded teacher when S-curve examples are included, but
 it does not generalize to S-curves from straight/soft-curve examples alone.
 Randomized curved teacher data fixes the first generalization failure much more

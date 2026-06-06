@@ -452,6 +452,34 @@ improve held-out S-curve recovery. The project should move toward better
 recovery labels and reference generation rather than trying to tune sampling
 weights.
 
+The recovery teacher was then changed from nominal lookahead to a local
+path-rejoin target:
+
+```text
+recovery_teacher=rejoin
+checkpoint=feature_bc_augmented_rejoin_no_prev_no_seq_leave_s_curve_out_20e.npz
+feature_count=22
+sequence_features=none
+prev_command_features=none
+privileged_features=none
+heldout_s_curve_mse=0.00185871
+heldout_s_curve_mae_yaw_rate=0.05335076
+comparison_s_curve learned_vs_teacher mse=0.00173593
+comparison_s_curve reactive_vs_teacher mse=0.14797705
+phase=off_nominal learned_vs_teacher mse=0.00490683
+```
+
+This is the strongest offline result so far. The lesson is useful for the final
+project: changing the teacher/reference made the feature GRU much more
+learnable, while sampling-weight tricks did not. The `rejoin` teacher slows
+forward pitch and labels lateral/yaw/altitude recovery toward a near future
+point on the reference line before gate commit.
+
+This still does not prove closed-loop racing. It proves the deployable feature
+policy can imitate a better recovery reference on a held-out S-curve without
+previous-command feedback or perfect sequence labels. Closed-loop rollout is the
+next evidence layer when a simulator is available.
+
 This means the direction is correct but incomplete. The next teacher upgrade is
 closed-loop relabeling: log privileged debug world position from failed Elodin
 rollouts, compute the desired lookahead/minimum-snap correction from that

@@ -233,6 +233,54 @@ def teacher_command_from_state(
     )
 
 
+def recovery_command_from_state(
+    *,
+    position: np.ndarray,
+    yaw: float,
+    velocity_world: np.ndarray,
+    reference_position: np.ndarray,
+    reference_velocity_world: np.ndarray,
+    rejoin_target: np.ndarray,
+) -> np.ndarray:
+    """Recovery-oriented teacher for off-corridor states.
+
+    The nominal teacher points at a future racing-line sample. For recovery
+    rows, we want a more explicit local policy: slow down, remove lateral error
+    and lateral velocity, hold altitude, then rejoin the reference line before
+    committing to the next gate.
+    """
+    world_to_body = yaw_to_matrix(yaw).T
+    target_body = world_to_body @ (rejoin_target - position)
+    reference_error_body = world_to_body @ (reference_position - position)
+    velocity_body = world_to_body @ velocity_world
+    reference_velocity_body = world_to_body @ reference_velocity_world
+    relative_velocity_body = velocity_body - reference_velocity_body
+
+    forward = max(1.0, float(target_body[0]))
+    yaw_error = math.atan2(float(target_body[1]), forward)
+    lateral_error = float(reference_error_body[1])
+    lateral_velocity_error = float(relative_velocity_body[1])
+    altitude_error = float(reference_position[2] - position[2])
+
+    # Positive lateral error means the reference line is to the drone's right in
+    # body coordinates. In the Elodin/RC convention, positive roll/yaw recenters
+    # a right-side target.
+    roll = (
+        0.26 * np.clip(lateral_error, -2.5, 2.5)
+        + 0.18 * yaw_error
+        - 0.08 * lateral_velocity_error
+    )
+    yaw_rate = 0.95 * yaw_error + 0.12 * np.clip(lateral_error, -2.5, 2.5)
+
+    # Recovery should avoid accelerating hard while still far off the line.
+    pitch = -0.09 - 0.018 * max(0.0, float(velocity_body[0]) - 3.0)
+    if abs(lateral_error) > 0.8 or abs(yaw_error) > 0.25:
+        pitch = max(pitch, -0.045)
+
+    thrust = 0.61 + 0.08 * altitude_error - 0.035 * float(velocity_body[2])
+    return clamp_command((roll, pitch, yaw_rate, thrust))
+
+
 def gate_yaws_from_centers(centers: list[tuple[float, float, float]]) -> list[float]:
     yaws: list[float] = []
     for idx, center in enumerate(centers):
@@ -300,6 +348,7 @@ def generate_rows(
     launch_samples: int,
     off_nominal_episodes: int,
     off_nominal_length: int,
+    recovery_teacher: str,
     rng: np.random.Generator,
 ) -> list[dict[str, str]]:
     start = np.asarray([0.0, 0.0, 1.8], dtype=np.float64)
@@ -365,8 +414,10 @@ def generate_rows(
     rows: list[dict[str, str]] = []
     prev_command_by_episode: dict[str, np.ndarray] = {}
 
-    def lookahead_for_sample(sample_idx: int) -> np.ndarray:
-        lookahead_distance = cumulative_distance_np[sample_idx] + lookahead_m
+    def lookahead_for_sample(sample_idx: int, lookahead_override_m: float | None = None) -> np.ndarray:
+        lookahead_distance = cumulative_distance_np[sample_idx] + (
+            lookahead_m if lookahead_override_m is None else lookahead_override_m
+        )
         lookahead_idx = int(np.searchsorted(cumulative_distance_np, lookahead_distance, side="left"))
         lookahead_idx = min(lookahead_idx, len(samples) - 1)
         lookahead_target = samples[lookahead_idx]["position"]
@@ -386,9 +437,10 @@ def generate_rows(
         yaw: float,
         heading_rate: float,
         command: np.ndarray | None = None,
+        target_override: np.ndarray | None = None,
     ) -> None:
         nonlocal rows
-        lookahead_target = lookahead_for_sample(sample_idx)
+        lookahead_target = target_override if target_override is not None else lookahead_for_sample(sample_idx)
         bearing_h, bearing_v, distance, _lateral, _vertical = bearing_to_gate(
             position=position,
             yaw_rad=yaw,
@@ -596,6 +648,23 @@ def generate_rows(
                     [0.0, -0.45 * lateral_offset * decay, -0.35 * vertical_offset * decay],
                     dtype=np.float64,
                 )
+                command = None
+                target_override = None
+                if recovery_teacher == "rejoin":
+                    offtrack_m = float(np.linalg.norm(body_offset[1:]))
+                    rejoin_target = lookahead_for_sample(
+                        sample_idx,
+                        lookahead_override_m=float(np.clip(2.4 + 0.35 * offtrack_m, 2.2, lookahead_m)),
+                    )
+                    command = recovery_command_from_state(
+                        position=position,
+                        yaw=yaw,
+                        velocity_world=velocity_world,
+                        reference_position=position_ref,
+                        reference_velocity_world=velocity_ref,
+                        rejoin_target=rejoin_target,
+                    )
+                    target_override = rejoin_target
                 append_row(
                     episode_id=episode_id,
                     teacher_phase="off_nominal",
@@ -607,6 +676,8 @@ def generate_rows(
                     acceleration_world=acceleration_world,
                     yaw=yaw,
                     heading_rate=heading_rate - 0.55 * yaw_offset * decay,
+                    command=command,
+                    target_override=target_override,
                 )
     return rows
 
@@ -628,6 +699,12 @@ def main() -> int:
     parser.add_argument("--launch-samples", type=int, default=0)
     parser.add_argument("--off-nominal-episodes-per-course", type=int, default=0)
     parser.add_argument("--off-nominal-length", type=int, default=24)
+    parser.add_argument(
+        "--recovery-teacher",
+        choices=("baseline", "rejoin"),
+        default="baseline",
+        help="Teacher used for off-nominal rows. 'rejoin' adds explicit path-rejoin labels.",
+    )
     parser.add_argument("--random-seed", type=int, default=7)
     args = parser.parse_args()
 
@@ -654,6 +731,7 @@ def main() -> int:
                 launch_samples=args.launch_samples,
                 off_nominal_episodes=args.off_nominal_episodes_per_course,
                 off_nominal_length=args.off_nominal_length,
+                recovery_teacher=args.recovery_teacher,
                 rng=rng,
             )
         )
@@ -675,7 +753,8 @@ def main() -> int:
         "teacher_augments="
         f"launch_samples={args.launch_samples} "
         f"off_nominal_episodes_per_course={args.off_nominal_episodes_per_course} "
-        f"off_nominal_length={args.off_nominal_length}"
+        f"off_nominal_length={args.off_nominal_length} "
+        f"recovery_teacher={args.recovery_teacher}"
     )
     print("student_inputs=FPV-derived features, tracker-like mode/history, telemetry")
     print("privileged_fields=teacher_* and world_* columns; do not feed to deployed policy")

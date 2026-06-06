@@ -25,10 +25,12 @@ EPOCHS="${EPOCHS:-20}"
 BATCH_SIZE="${BATCH_SIZE:-256}"
 PHASE_SAMPLING_WEIGHTS="${PHASE_SAMPLING_WEIGHTS:-}"
 MODE_SAMPLING_WEIGHTS="${MODE_SAMPLING_WEIGHTS:-}"
+RECOVERY_TEACHER="${RECOVERY_TEACHER:-baseline}"
 
 echo "[CS260C] python=$PYTHON_BIN"
 echo "[CS260C] trace=$TRACE"
 echo "[CS260C] checkpoint=$CHECKPOINT"
+echo "[CS260C] recovery_teacher=$RECOVERY_TEACHER"
 if [[ -n "$PHASE_SAMPLING_WEIGHTS" || -n "$MODE_SAMPLING_WEIGHTS" ]]; then
   echo "[CS260C] phase_sampling_weights=${PHASE_SAMPLING_WEIGHTS:-none}"
   echo "[CS260C] mode_sampling_weights=${MODE_SAMPLING_WEIGHTS:-none}"
@@ -41,6 +43,7 @@ fi
   --launch-samples 24 \
   --off-nominal-episodes-per-course 4 \
   --off-nominal-length 24 \
+  --recovery-teacher "$RECOVERY_TEACHER" \
   --random-seed 17
 
 "$PYTHON_BIN" scripts/audit_learning_feature_spec.py \
