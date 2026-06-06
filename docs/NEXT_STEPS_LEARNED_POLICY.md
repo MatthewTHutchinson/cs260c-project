@@ -409,6 +409,29 @@ final z after 4 s smoke: 0.46 m -> 1.29 m
 10 s rollout reached x=9.92 m near gate 0 but y=1.62 m, so it missed laterally
 ```
 
+Follow-up after removing both previous-command and sequence-index features,
+2026-06-06:
+
+```text
+checkpoint=feature_bc_augmented_no_prev_no_seq_leave_s_curve_out_20e.npz
+feature_count=22
+sequence_features=none
+prev_command_features=none
+privileged_features=none
+heldout_s_curve_mse=0.02086311
+heldout_s_curve_mae_yaw_rate=0.12600399
+comparison_s_curve learned_vs_teacher mse=0.02080014
+comparison_s_curve reactive_vs_teacher mse=0.17126263
+phase=off_nominal learned_vs_teacher mse=0.11474959
+```
+
+This is a cleaner final-project baseline than the earlier checkpoint because it
+does not depend on perfect teacher-side sequence labels or previous-action
+feedback. It is weaker than the easiest offline teacher-forced models, but that
+is the point: it is a more honest estimate of what the deployable feature policy
+can learn. The remaining failure is still recovery behavior, especially roll/yaw
+authority during off-nominal and near-gate commit states.
+
 This means the direction is correct but incomplete. The next teacher upgrade is
 closed-loop relabeling: log privileged debug world position from failed Elodin
 rollouts, compute the desired lookahead/minimum-snap correction from that

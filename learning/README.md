@@ -238,6 +238,12 @@ python -m learning.export_policy_npz \
   --out logs/learning_smoke/feature_bc_augmented_no_prev_no_seq_leave_s_curve_out_20e.npz
 ```
 
+The full local ablation can be reproduced with:
+
+```bash
+scripts/run_feature_policy_ablation.sh
+```
+
 Export that checkpoint to a pure NumPy runtime artifact before deploying it in
 the simulator harness:
 
@@ -304,6 +310,32 @@ s_curve held-out mse=0.00101455
 mae_yaw_rate=0.03836820
 runtime smoke thrust_norm=0.557330
 ```
+
+Current no-previous-command / no-sequence-feature checkpoint, 2026-06-06:
+
+```text
+trace_augmented.csv rows=14280 courses=26
+feature_count=22
+sequence_features=none
+prev_command_features=none
+privileged_features=none
+best_val_mse=0.00632667
+heldout_s_curve_mse=0.02086311
+heldout_s_curve_mae_yaw_rate=0.12600399
+comparison_s_curve learned_vs_teacher mse=0.02080014
+comparison_s_curve reactive_vs_teacher mse=0.17126263
+phase=launch learned_vs_teacher mse=0.00048573
+phase=nominal learned_vs_teacher mse=0.00184103
+phase=off_nominal learned_vs_teacher mse=0.11474959
+runtime smoke thrust_norm=0.692957
+```
+
+Interpretation: the stricter policy is still much closer to the privileged
+teacher than the reactive controller on the held-out canonical S-curve, even
+without perfect sequence features. The weak spot remains off-nominal recovery:
+the policy underfits the high roll/yaw corrections needed during recovery and
+near-gate commit. The next algorithmic step is therefore a better recovery
+teacher, not a larger network.
 
 The model can fit the upgraded teacher when S-curve examples are included, but
 it does not generalize to S-curves from straight/soft-curve examples alone.
