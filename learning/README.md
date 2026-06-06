@@ -641,6 +641,35 @@ losing gate 0. Do not assume more relabel rows automatically help. The current
 runtime candidate is the 3-relabel checkpoint; the 4-relabel data is useful as
 a hard negative example for the next supervisor/data-balancing pass.
 
+Source-aware sampling follow-up, 2026-06-06:
+
+```bash
+RELABELS="\
+logs/privileged_teacher/closed_loop_relabels/easy_rejoin_guard_001_rejoin.csv \
+logs/privileged_teacher/closed_loop_relabels/easy_source_logging_10s_001_rejoin_source.csv \
+logs/privileged_teacher/closed_loop_relabels/easy_source_logging_6s_001_rejoin_source.csv \
+logs/privileged_teacher/closed_loop_relabels/easy_after_gate0_001_rejoin_source.csv" \
+RUN_NAME=feature_bc_augmented_rejoin_plus_4relabels_aftergate025_no_prev_no_seq_20e \
+TRACE_SAMPLING_WEIGHTS=easy_after_gate0_001_rejoin_source=0.25 \
+scripts/run_closed_loop_relabel_training.sh
+```
+
+```text
+weighted_sampling trace={'easy_after_gate0_001_rejoin_source': 0.25}
+best_val_mse=0.00259221
+heldout_s_curve_mse=0.00175359
+all_relabels_mse=0.00396392
+10s_easy_rollout=DNF gates=0/3
+end_lateral_error_m=-5.138923
+command_sources={'reactive_fallback': 460, 'learned': 201}
+```
+
+Downweighting the post-gate relabel improved the offline S-curve metric but did
+not recover the 3-relabel closed-loop gate pass. The next useful experiment is
+not another scalar trace weight. Split the problem into separate policies or
+supervisor modes: first-gate approach, post-gate reacquisition, and fallback
+recovery should be selected by state, not blended into one BC distribution.
+
 The runtime wrapper lives in `algorithm/learned_controller.py`. It is optional:
 `AutonomousRacingPilot` uses it only when one is supplied and the current gate
 estimate is usable, otherwise the reactive controller handles search/fallback.

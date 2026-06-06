@@ -572,6 +572,13 @@ source-aware selection/balancing. Adding a hard post-gate failure episode can
 overcorrect the first-gate approach if it is mixed naively with the rest of the
 teacher data.
 
+The first source-aware weighting experiment downweighted the hard post-gate
+trace to `0.25`. It improved offline S-curve MSE again (`0.00175359`) but still
+finished `DNF gates=0/3` with `end_lateral_error_m=-5.138923`. That narrows the
+next step: build a supervisor/state split for first-gate approach versus
+post-gate reacquisition instead of trying to solve both by scalar sampling
+weights inside one blended BC policy.
+
 ## Robustness Work
 
 Randomization should be added before trusting learned-policy results:

@@ -75,14 +75,20 @@ def summarize_course(course: str, rows: list[dict[str, str]]) -> list[str]:
     world_y = np.asarray([as_float(row, "world_y_m") for row in rows], dtype=np.float64)
     lateral_target_delta = target_y - world_y
     phase_counts: dict[str, int] = defaultdict(int)
+    source_counts: dict[str, int] = defaultdict(int)
     for row in rows:
         phase_counts[row.get("teacher_phase", "unknown") or "unknown"] += 1
+        source_counts[row.get("command_source", "unknown") or "unknown"] += 1
     phase_summary = ",".join(f"{phase}:{count}" for phase, count in sorted(phase_counts.items()))
+    source_summary = ",".join(
+        f"{source}:{count}" for source, count in sorted(source_counts.items())
+    )
 
     return [
         (
             f"course={course} rows={len(rows)} "
             f"phases={phase_summary} "
+            f"command_sources={source_summary} "
             f"abs_bearing_h_mean={np.nanmean(np.abs(bearing_h)):.4f} "
             f"abs_bearing_h_p95={percentile(np.abs(bearing_h), 95):.4f} "
             f"distance_min={np.nanmin(distance):.2f} distance_max={np.nanmax(distance):.2f}"

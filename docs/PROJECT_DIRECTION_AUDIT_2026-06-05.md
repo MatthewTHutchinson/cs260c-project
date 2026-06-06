@@ -78,6 +78,10 @@ success on lateral, circular, and S-shaped recovery cases.
   `DNF gates=1/3` with gate 0 passed at `t=5.19`. A fourth post-gate relabel
   improved offline S-curve MSE but regressed the 10 s easy rollout to `0/3`,
   so data selection/balancing now matters as much as adding more rows.
+- Source/episode/trace weighting is now implemented for BC training. The first
+  weighting test downweighted the post-gate relabel to `0.25`; it improved
+  offline S-curve MSE but still finished `0/3`. The next bottleneck is likely a
+  supervisor/state split, not more scalar sampling tweaks.
 - Some synthetic teacher tracks are already saturating roll/yaw commands,
   especially S-curve variants. That may be useful stress coverage, but it also
   means the teacher is pushing against actuator limits and should be validated

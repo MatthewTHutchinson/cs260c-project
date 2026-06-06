@@ -68,10 +68,29 @@ def sample_weight_for_row(
     *,
     phase_weights: dict[str, float],
     mode_weights: dict[str, float],
+    episode_weights: dict[str, float],
+    command_source_weights: dict[str, float],
+    trace_weights: dict[str, float],
 ) -> float:
     phase = str(row.get("teacher_phase", "")).strip()
     mode = str(row.get("mode", "")).strip()
-    return phase_weights.get(phase, 1.0) * mode_weights.get(mode, 1.0)
+    episode = str(row.get("episode_id", "")).strip()
+    command_source = str(row.get("command_source", "")).strip()
+    trace_path = str(row.get("_trace_path", "")).strip()
+    trace_weight = 1.0
+    if trace_path:
+        path = Path(trace_path)
+        for key in (trace_path, path.name, path.stem):
+            if key in trace_weights:
+                trace_weight = trace_weights[key]
+                break
+    return (
+        phase_weights.get(phase, 1.0)
+        * mode_weights.get(mode, 1.0)
+        * episode_weights.get(episode, 1.0)
+        * command_source_weights.get(command_source, 1.0)
+        * trace_weight
+    )
 
 
 def main() -> int:
@@ -113,6 +132,21 @@ def main() -> int:
         default="",
         help="Comma-separated mode=weight values, e.g. commit=2,detected=1.",
     )
+    parser.add_argument(
+        "--episode-sampling-weights",
+        default="",
+        help="Comma-separated episode_id=weight values for source-aware DAgger balancing.",
+    )
+    parser.add_argument(
+        "--command-source-sampling-weights",
+        default="",
+        help="Comma-separated command_source=weight values, e.g. reactive_fallback=2,learned=1.",
+    )
+    parser.add_argument(
+        "--trace-sampling-weights",
+        default="",
+        help="Comma-separated trace filename/stem/path=weight values for relabel selection.",
+    )
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -145,14 +179,26 @@ def main() -> int:
     val_data = NormalizedDataset(val_base, mean, std)
     phase_weights = parse_weight_map(args.phase_sampling_weights)
     mode_weights = parse_weight_map(args.mode_sampling_weights)
+    episode_weights = parse_weight_map(args.episode_sampling_weights)
+    command_source_weights = parse_weight_map(args.command_source_sampling_weights)
+    trace_weights = parse_weight_map(args.trace_sampling_weights)
     sampler = None
-    if phase_weights or mode_weights:
+    if (
+        phase_weights
+        or mode_weights
+        or episode_weights
+        or command_source_weights
+        or trace_weights
+    ):
         sample_weights = torch.as_tensor(
             [
                 sample_weight_for_row(
                     dataset.sample_rows[index],
                     phase_weights=phase_weights,
                     mode_weights=mode_weights,
+                    episode_weights=episode_weights,
+                    command_source_weights=command_source_weights,
+                    trace_weights=trace_weights,
                 )
                 for index in train_idx
             ],
@@ -166,7 +212,10 @@ def main() -> int:
         print(
             "weighted_sampling="
             f"phase={phase_weights or '{}'} "
-            f"mode={mode_weights or '{}'}"
+            f"mode={mode_weights or '{}'} "
+            f"episode={episode_weights or '{}'} "
+            f"command_source={command_source_weights or '{}'} "
+            f"trace={trace_weights or '{}'}"
         )
     train_loader = DataLoader(
         train_data,
@@ -221,6 +270,9 @@ def main() -> int:
                     "no_sequence_features": bool(args.no_sequence_features),
                     "phase_sampling_weights": phase_weights,
                     "mode_sampling_weights": mode_weights,
+                    "episode_sampling_weights": episode_weights,
+                    "command_source_sampling_weights": command_source_weights,
+                    "trace_sampling_weights": trace_weights,
                 },
             )
 

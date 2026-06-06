@@ -23,6 +23,11 @@ CHECKPOINT="${CHECKPOINT:-logs/learning_smoke/${RUN_NAME}.pt}"
 NPZ="${NPZ:-logs/learning_smoke/${RUN_NAME}.npz}"
 PREDICTIONS="${PREDICTIONS:-logs/learning_smoke/${RUN_NAME}_${COURSE}_predictions.csv}"
 RELABEL_PREDICTIONS="${RELABEL_PREDICTIONS:-logs/learning_smoke/${RUN_NAME}_relabel_predictions.csv}"
+PHASE_SAMPLING_WEIGHTS="${PHASE_SAMPLING_WEIGHTS:-}"
+MODE_SAMPLING_WEIGHTS="${MODE_SAMPLING_WEIGHTS:-}"
+EPISODE_SAMPLING_WEIGHTS="${EPISODE_SAMPLING_WEIGHTS:-}"
+COMMAND_SOURCE_SAMPLING_WEIGHTS="${COMMAND_SOURCE_SAMPLING_WEIGHTS:-}"
+TRACE_SAMPLING_WEIGHTS="${TRACE_SAMPLING_WEIGHTS:-}"
 
 if [[ ! -f "$BASE_TRACE" ]]; then
   echo "[CS260C] missing BASE_TRACE=$BASE_TRACE" >&2
@@ -48,6 +53,13 @@ echo "[CS260C] python=$PYTHON_BIN"
 echo "[CS260C] base_trace=$BASE_TRACE"
 echo "[CS260C] relabel_count=${#RELABEL_ARGS[@]}"
 echo "[CS260C] checkpoint=$CHECKPOINT"
+if [[ -n "$PHASE_SAMPLING_WEIGHTS" || -n "$MODE_SAMPLING_WEIGHTS" || -n "$EPISODE_SAMPLING_WEIGHTS" || -n "$COMMAND_SOURCE_SAMPLING_WEIGHTS" || -n "$TRACE_SAMPLING_WEIGHTS" ]]; then
+  echo "[CS260C] phase_sampling_weights=${PHASE_SAMPLING_WEIGHTS:-none}"
+  echo "[CS260C] mode_sampling_weights=${MODE_SAMPLING_WEIGHTS:-none}"
+  echo "[CS260C] episode_sampling_weights=${EPISODE_SAMPLING_WEIGHTS:-none}"
+  echo "[CS260C] command_source_sampling_weights=${COMMAND_SOURCE_SAMPLING_WEIGHTS:-none}"
+  echo "[CS260C] trace_sampling_weights=${TRACE_SAMPLING_WEIGHTS:-none}"
+fi
 
 "$PYTHON_BIN" scripts/audit_learning_feature_spec.py \
   --no-prev-command-features \
@@ -56,14 +68,33 @@ echo "[CS260C] checkpoint=$CHECKPOINT"
   --expect-no-sequence-features \
   --trace "$BASE_TRACE"
 
-"$PYTHON_BIN" -m learning.train_bc \
-  "${TRACE_ARGS[@]}" \
-  --exclude-courses "$COURSE" \
-  --epochs "$EPOCHS" \
-  --batch-size "$BATCH_SIZE" \
-  --no-prev-command-features \
-  --no-sequence-features \
+TRAIN_ARGS=(
+  "${TRACE_ARGS[@]}"
+  --exclude-courses "$COURSE"
+  --epochs "$EPOCHS"
+  --batch-size "$BATCH_SIZE"
+  --no-prev-command-features
+  --no-sequence-features
   --out "$CHECKPOINT"
+)
+
+if [[ -n "$PHASE_SAMPLING_WEIGHTS" ]]; then
+  TRAIN_ARGS+=(--phase-sampling-weights "$PHASE_SAMPLING_WEIGHTS")
+fi
+if [[ -n "$MODE_SAMPLING_WEIGHTS" ]]; then
+  TRAIN_ARGS+=(--mode-sampling-weights "$MODE_SAMPLING_WEIGHTS")
+fi
+if [[ -n "$EPISODE_SAMPLING_WEIGHTS" ]]; then
+  TRAIN_ARGS+=(--episode-sampling-weights "$EPISODE_SAMPLING_WEIGHTS")
+fi
+if [[ -n "$COMMAND_SOURCE_SAMPLING_WEIGHTS" ]]; then
+  TRAIN_ARGS+=(--command-source-sampling-weights "$COMMAND_SOURCE_SAMPLING_WEIGHTS")
+fi
+if [[ -n "$TRACE_SAMPLING_WEIGHTS" ]]; then
+  TRAIN_ARGS+=(--trace-sampling-weights "$TRACE_SAMPLING_WEIGHTS")
+fi
+
+"$PYTHON_BIN" -m learning.train_bc "${TRAIN_ARGS[@]}"
 
 "$PYTHON_BIN" -m learning.eval_policy \
   --checkpoint "$CHECKPOINT" \

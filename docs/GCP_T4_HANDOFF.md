@@ -389,6 +389,22 @@ the fourth post-gate relabel improved offline S-curve MSE but regressed the 10 s
 easy rollout to `0/3`, so the next T4 work should compare relabel balancing and
 source-aware sampling rather than blindly adding every failure trace.
 
+The wrapper supports:
+
+```text
+PHASE_SAMPLING_WEIGHTS
+MODE_SAMPLING_WEIGHTS
+EPISODE_SAMPLING_WEIGHTS
+COMMAND_SOURCE_SAMPLING_WEIGHTS
+TRACE_SAMPLING_WEIGHTS
+```
+
+First weighting result: `TRACE_SAMPLING_WEIGHTS=easy_after_gate0_001_rejoin_source=0.25`
+improved held-out S-curve MSE to `0.00175359`, but the 10 s easy rollout still
+regressed to `0/3`. Treat scalar weighting as a diagnostic tool. The next
+substantive algorithm step is a supervisor/state split between first-gate
+approach, post-gate reacquisition, and fallback recovery.
+
 Inspect the audit output before spending GPU time. The useful plots are the
 curved tracks first: `circular_arc_teacher_audit.png` and
 `s_curve_teacher_audit.png`. Also check `command_saturation_pct`; some

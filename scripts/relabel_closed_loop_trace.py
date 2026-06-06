@@ -363,6 +363,7 @@ def relabel_rows(
                 "course": course_name,
                 "episode_id": episode_id,
                 "teacher_phase": f"closed_loop_{teacher}",
+                "command_source": row.get("command_source", "closed_loop"),
                 "last_gate_passed": str(as_int(row, "last_gate_passed", -1)),
                 "next_gate_index": str(gate.index),
                 "mode": mode,
