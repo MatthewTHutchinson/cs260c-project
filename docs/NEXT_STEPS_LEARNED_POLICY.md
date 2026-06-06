@@ -554,6 +554,24 @@ to separate learned-policy failures from fallback/supervisor failures. The
 latest 10 s failure was mostly `reactive_fallback`, so the fallback/supervisor
 boundary is part of the problem.
 
+The third relabel iteration used three source-logged rejoin relabel episodes
+and is the best closed-loop result so far:
+
+```text
+checkpoint=feature_bc_augmented_rejoin_plus_3relabels_no_prev_no_seq_20e.npz
+heldout_s_curve_mse=0.00191887
+all_relabels_mse=0.00100016
+10s_easy_rollout=DNF gates=1/3 gate0_pass_t=5.19
+command_sources={'reactive_fallback': 442, 'learned': 189}
+```
+
+The fourth relabel iteration added the new post-gate failure trace. It improved
+offline held-out S-curve MSE (`0.00185186`) but regressed the 10 s easy rollout
+to `DNF gates=0/3`. This is a useful warning: DAgger-style relabeling needs
+source-aware selection/balancing. Adding a hard post-gate failure episode can
+overcorrect the first-gate approach if it is mixed naively with the rest of the
+teacher data.
+
 ## Robustness Work
 
 Randomization should be added before trusting learned-policy results:

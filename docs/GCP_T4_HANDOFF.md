@@ -372,6 +372,23 @@ Command-source logging on the latest 10 s failure showed
 multiple relabeled failure episodes and source-aware ablations, not on scaling a
 single episode or tuning sampling weights.
 
+Use the repeatable local/T4 wrapper for relabel training:
+
+```bash
+RELABELS="\
+logs/privileged_teacher/closed_loop_relabels/easy_rejoin_guard_001_rejoin.csv \
+logs/privileged_teacher/closed_loop_relabels/easy_source_logging_10s_001_rejoin.csv \
+logs/privileged_teacher/closed_loop_relabels/easy_source_logging_6s_001_rejoin.csv" \
+RUN_NAME=feature_bc_augmented_rejoin_plus_3relabels_no_prev_no_seq_20e \
+scripts/run_closed_loop_relabel_training.sh
+```
+
+Current local finding: the 3-relabel checkpoint is the best closed-loop
+candidate so far (`10s_easy_rollout=DNF gates=1/3`, gate 0 at `t=5.19`). Adding
+the fourth post-gate relabel improved offline S-curve MSE but regressed the 10 s
+easy rollout to `0/3`, so the next T4 work should compare relabel balancing and
+source-aware sampling rather than blindly adding every failure trace.
+
 Inspect the audit output before spending GPU time. The useful plots are the
 curved tracks first: `circular_arc_teacher_audit.png` and
 `s_curve_teacher_audit.png`. Also check `command_saturation_pct`; some

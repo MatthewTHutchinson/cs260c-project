@@ -74,6 +74,10 @@ success on lateral, circular, and S-shaped recovery cases.
   is bad." On the latest 10 s `easy` failure, the trace had
   `reactive_fallback=528` rows and `learned=131` rows. The fallback/supervisor
   boundary is therefore part of the navigation problem.
+- A 3-relabel DAgger-style checkpoint is the best closed-loop result so far:
+  `DNF gates=1/3` with gate 0 passed at `t=5.19`. A fourth post-gate relabel
+  improved offline S-curve MSE but regressed the 10 s easy rollout to `0/3`,
+  so data selection/balancing now matters as much as adding more rows.
 - Some synthetic teacher tracks are already saturating roll/yaw commands,
   especially S-curve variants. That may be useful stress coverage, but it also
   means the teacher is pushing against actuator limits and should be validated

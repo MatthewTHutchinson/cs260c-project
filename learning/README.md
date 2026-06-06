@@ -593,6 +593,54 @@ boundary is now a real bottleneck too. The next useful work is multiple
 closed-loop relabel episodes plus source-aware fallback design, not a quick
 visual-servo gain patch.
 
+Repeatable multi-relabel training command:
+
+```bash
+RELABELS="\
+logs/privileged_teacher/closed_loop_relabels/easy_rejoin_guard_001_rejoin.csv \
+logs/privileged_teacher/closed_loop_relabels/easy_source_logging_10s_001_rejoin.csv \
+logs/privileged_teacher/closed_loop_relabels/easy_source_logging_6s_001_rejoin.csv" \
+RUN_NAME=feature_bc_augmented_rejoin_plus_3relabels_no_prev_no_seq_20e \
+scripts/run_closed_loop_relabel_training.sh
+```
+
+Third relabel iteration, 2026-06-06:
+
+```text
+relabel_sources=easy_rejoin_guard_001,easy_source_logging_10s_001,easy_source_logging_6s_001
+best_val_mse=0.00215757
+heldout_s_curve_mse=0.00191887
+all_relabels_mse=0.00100016
+10s_easy_rollout=DNF gates=1/3 gate0_pass_t=5.19
+command_sources={'reactive_fallback': 442, 'learned': 189}
+post_gate_rows=237
+post_gate_yaw_alignment=0.789
+post_gate_roll_alignment=0.789
+```
+
+This is the best closed-loop result so far: it passes gate 0 in a 10 s run.
+The failure moved to post-gate reacquisition and gate-1 lateral control.
+
+Fourth relabel iteration, 2026-06-06:
+
+```text
+additional_relabel=easy_after_gate0_001_rejoin.csv
+additional_relabel_rows=441
+additional_relabel_next_gate_index_counts={0: 284, 1: 157}
+best_val_mse=0.00240992
+heldout_s_curve_mse=0.00185186
+all_relabels_mse=0.00181738
+10s_easy_rollout=DNF gates=0/3
+end_lateral_error_m=-2.221839
+command_sources={'reactive_fallback': 312, 'learned': 327}
+```
+
+This iteration improved offline S-curve error and kept lateral error much
+smaller, but it regressed closed-loop gate completion by overcorrecting left and
+losing gate 0. Do not assume more relabel rows automatically help. The current
+runtime candidate is the 3-relabel checkpoint; the 4-relabel data is useful as
+a hard negative example for the next supervisor/data-balancing pass.
+
 The runtime wrapper lives in `algorithm/learned_controller.py`. It is optional:
 `AutonomousRacingPilot` uses it only when one is supplied and the current gate
 estimate is usable, otherwise the reactive controller handles search/fallback.
