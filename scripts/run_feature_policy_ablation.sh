@@ -23,10 +23,16 @@ COMPARISON="${COMPARISON:-logs/controller_comparison/s_curve_no_prev_no_seq_npz_
 COMPARISON_PLOT="${COMPARISON_PLOT:-logs/controller_comparison/s_curve_no_prev_no_seq_npz_comparison.png}"
 EPOCHS="${EPOCHS:-20}"
 BATCH_SIZE="${BATCH_SIZE:-256}"
+PHASE_SAMPLING_WEIGHTS="${PHASE_SAMPLING_WEIGHTS:-}"
+MODE_SAMPLING_WEIGHTS="${MODE_SAMPLING_WEIGHTS:-}"
 
 echo "[CS260C] python=$PYTHON_BIN"
 echo "[CS260C] trace=$TRACE"
 echo "[CS260C] checkpoint=$CHECKPOINT"
+if [[ -n "$PHASE_SAMPLING_WEIGHTS" || -n "$MODE_SAMPLING_WEIGHTS" ]]; then
+  echo "[CS260C] phase_sampling_weights=${PHASE_SAMPLING_WEIGHTS:-none}"
+  echo "[CS260C] mode_sampling_weights=${MODE_SAMPLING_WEIGHTS:-none}"
+fi
 
 "$PYTHON_BIN" scripts/generate_privileged_teacher_dataset.py \
   --out "$TRACE" \
@@ -44,14 +50,24 @@ echo "[CS260C] checkpoint=$CHECKPOINT"
   --expect-no-sequence-features \
   --trace "$TRACE"
 
-"$PYTHON_BIN" -m learning.train_bc \
-  --traces "$TRACE" \
-  --exclude-courses "$COURSE" \
-  --epochs "$EPOCHS" \
-  --batch-size "$BATCH_SIZE" \
-  --no-prev-command-features \
-  --no-sequence-features \
+TRAIN_ARGS=(
+  --traces "$TRACE"
+  --exclude-courses "$COURSE"
+  --epochs "$EPOCHS"
+  --batch-size "$BATCH_SIZE"
+  --no-prev-command-features
+  --no-sequence-features
   --out "$CHECKPOINT"
+)
+
+if [[ -n "$PHASE_SAMPLING_WEIGHTS" ]]; then
+  TRAIN_ARGS+=(--phase-sampling-weights "$PHASE_SAMPLING_WEIGHTS")
+fi
+if [[ -n "$MODE_SAMPLING_WEIGHTS" ]]; then
+  TRAIN_ARGS+=(--mode-sampling-weights "$MODE_SAMPLING_WEIGHTS")
+fi
+
+"$PYTHON_BIN" -m learning.train_bc "${TRAIN_ARGS[@]}"
 
 "$PYTHON_BIN" -m learning.eval_policy \
   --checkpoint "$CHECKPOINT" \

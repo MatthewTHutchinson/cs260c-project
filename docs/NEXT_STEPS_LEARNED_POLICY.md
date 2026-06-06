@@ -432,6 +432,26 @@ is the point: it is a more honest estimate of what the deployable feature policy
 can learn. The remaining failure is still recovery behavior, especially roll/yaw
 authority during off-nominal and near-gate commit states.
 
+Recovery-weighted training was tested next:
+
+```text
+unweighted:
+  comparison_s_curve learned_vs_teacher mse=0.02080014
+  phase=off_nominal learned_vs_teacher mse=0.11474959
+off_nominal=2:
+  comparison_s_curve learned_vs_teacher mse=0.02373977
+  phase=off_nominal learned_vs_teacher mse=0.13114854
+off_nominal=4, commit=2:
+  comparison_s_curve learned_vs_teacher mse=0.02709405
+  phase=off_nominal learned_vs_teacher mse=0.14666850
+```
+
+This is a useful negative result. Simply sampling recovery/commit rows more
+often lowers training/validation loss on the source distribution but does not
+improve held-out S-curve recovery. The project should move toward better
+recovery labels and reference generation rather than trying to tune sampling
+weights.
+
 This means the direction is correct but incomplete. The next teacher upgrade is
 closed-loop relabeling: log privileged debug world position from failed Elodin
 rollouts, compute the desired lookahead/minimum-snap correction from that

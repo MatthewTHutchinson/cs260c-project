@@ -9,7 +9,7 @@ from pathlib import Path
 
 import torch
 from torch import nn
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
 
 from learning.datasets import (
     NormalizedDataset,
@@ -42,6 +42,38 @@ def evaluate(model: nn.Module, loader: DataLoader, device: torch.device, loss_fn
     return total / max(1, count)
 
 
+def parse_weight_map(raw: str | None) -> dict[str, float]:
+    if not raw:
+        return {}
+    weights: dict[str, float] = {}
+    for part in raw.split(","):
+        item = part.strip()
+        if not item:
+            continue
+        if "=" not in item:
+            raise ValueError(f"expected name=weight in {raw!r}, got {item!r}")
+        key, value = item.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise ValueError(f"empty weight key in {raw!r}")
+        weight = float(value)
+        if weight <= 0.0:
+            raise ValueError(f"weight for {key!r} must be positive")
+        weights[key] = weight
+    return weights
+
+
+def sample_weight_for_row(
+    row: dict[str, str],
+    *,
+    phase_weights: dict[str, float],
+    mode_weights: dict[str, float],
+) -> float:
+    phase = str(row.get("teacher_phase", "")).strip()
+    mode = str(row.get("mode", "")).strip()
+    return phase_weights.get(phase, 1.0) * mode_weights.get(mode, 1.0)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--traces", type=Path, nargs="*", default=[])
@@ -70,6 +102,16 @@ def main() -> int:
             "Drop last_gate_passed and next_gate_index inputs so the policy cannot "
             "lean on perfect teacher-side gate sequence labels."
         ),
+    )
+    parser.add_argument(
+        "--phase-sampling-weights",
+        default="",
+        help="Comma-separated teacher_phase=weight values, e.g. off_nominal=4,launch=2.",
+    )
+    parser.add_argument(
+        "--mode-sampling-weights",
+        default="",
+        help="Comma-separated mode=weight values, e.g. commit=2,detected=1.",
     )
     args = parser.parse_args()
 
@@ -101,7 +143,37 @@ def main() -> int:
     mean, std = fit_feature_normalizer(train_base)
     train_data = NormalizedDataset(train_base, mean, std)
     val_data = NormalizedDataset(val_base, mean, std)
-    train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
+    phase_weights = parse_weight_map(args.phase_sampling_weights)
+    mode_weights = parse_weight_map(args.mode_sampling_weights)
+    sampler = None
+    if phase_weights or mode_weights:
+        sample_weights = torch.as_tensor(
+            [
+                sample_weight_for_row(
+                    dataset.sample_rows[index],
+                    phase_weights=phase_weights,
+                    mode_weights=mode_weights,
+                )
+                for index in train_idx
+            ],
+            dtype=torch.double,
+        )
+        sampler = WeightedRandomSampler(
+            sample_weights,
+            num_samples=len(sample_weights),
+            replacement=True,
+        )
+        print(
+            "weighted_sampling="
+            f"phase={phase_weights or '{}'} "
+            f"mode={mode_weights or '{}'}"
+        )
+    train_loader = DataLoader(
+        train_data,
+        batch_size=args.batch_size,
+        shuffle=sampler is None,
+        sampler=sampler,
+    )
     val_loader = DataLoader(val_data, batch_size=args.batch_size)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -147,6 +219,8 @@ def main() -> int:
                     "exclude_courses": args.exclude_courses or [],
                     "no_prev_command_features": bool(args.no_prev_command_features),
                     "no_sequence_features": bool(args.no_sequence_features),
+                    "phase_sampling_weights": phase_weights,
+                    "mode_sampling_weights": mode_weights,
                 },
             )
 

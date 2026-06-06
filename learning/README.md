@@ -337,6 +337,36 @@ the policy underfits the high roll/yaw corrections needed during recovery and
 near-gate commit. The next algorithmic step is therefore a better recovery
 teacher, not a larger network.
 
+Recovery/commit weighted sampling follow-up, 2026-06-06:
+
+```bash
+PHASE_SAMPLING_WEIGHTS=off_nominal=4 \
+MODE_SAMPLING_WEIGHTS=commit=2 \
+CHECKPOINT=logs/learning_smoke/feature_bc_augmented_no_prev_no_seq_recovery_weighted_leave_s_curve_out_20e.pt \
+NPZ=logs/learning_smoke/feature_bc_augmented_no_prev_no_seq_recovery_weighted_leave_s_curve_out_20e.npz \
+scripts/run_feature_policy_ablation.sh
+```
+
+```text
+unweighted heldout_s_curve learned_vs_teacher mse=0.02080014
+unweighted phase=off_nominal learned_vs_teacher mse=0.11474959
+
+mild_weight off_nominal=2:
+  heldout_s_curve learned_vs_teacher mse=0.02373977
+  phase=off_nominal learned_vs_teacher mse=0.13114854
+
+strong_weight off_nominal=4, commit=2:
+  heldout_s_curve learned_vs_teacher mse=0.02709405
+  phase=off_nominal learned_vs_teacher mse=0.14666850
+```
+
+Weighted sampling improved same-distribution validation loss but made the
+held-out canonical S-curve recovery match worse. Do not treat oversampling as
+the fix. The next useful work is to change the recovery teacher/data
+distribution itself: richer off-corridor states, smoother high-authority labels,
+and a trajectory/reference that explains how to rejoin the gate line before
+commit.
+
 The model can fit the upgraded teacher when S-curve examples are included, but
 it does not generalize to S-curves from straight/soft-curve examples alone.
 Randomized curved teacher data fixes the first generalization failure much more
