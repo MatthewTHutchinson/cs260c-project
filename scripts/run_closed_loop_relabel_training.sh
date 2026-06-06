@@ -68,6 +68,12 @@ fi
   --expect-no-sequence-features \
   --trace "$BASE_TRACE"
 
+"$PYTHON_BIN" scripts/audit_teacher_quality_gate.py \
+  --trace "$BASE_TRACE" \
+  --require-courses easy,circular_arc,s_curve \
+  --require-phases launch,nominal,off_nominal \
+  --allowed-command-sources teacher
+
 TRAIN_ARGS=(
   "${TRACE_ARGS[@]}"
   --exclude-courses "$COURSE"

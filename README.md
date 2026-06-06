@@ -127,6 +127,17 @@ Validate active code:
 /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python scripts/audit_sequence_selection.py
 ```
 
+Run the current feature-policy experiment path:
+
+```bash
+scripts/run_feature_policy_ablation.sh
+```
+
+That wrapper regenerates the `rejoin` privileged teacher dataset, runs the
+teacher-quality and legal-feature gates, trains the deployable no-prev/no-sequence
+GRU baseline, exports `.npz`, and compares learned/reactive/teacher commands on
+the held-out S-curve.
+
 ## Project Rule
 
 Do not present old PyBullet track results as the final algorithm. The final

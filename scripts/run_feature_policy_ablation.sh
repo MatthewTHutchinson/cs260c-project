@@ -13,19 +13,19 @@ PYTHON_BIN="${PROJECT_PYTHON:-/Users/matthewhutchinson/miniconda3/envs/cs260c-pr
 # imported together. Linux/T4 runs normally with this value unused.
 export KMP_DUPLICATE_LIB_OK="${KMP_DUPLICATE_LIB_OK:-TRUE}"
 
-TRACE="${TRACE:-logs/privileged_teacher/trace_augmented.csv}"
+TRACE="${TRACE:-logs/privileged_teacher/trace_augmented_rejoin.csv}"
 COURSE="${COURSE:-s_curve}"
-CHECKPOINT="${CHECKPOINT:-logs/learning_smoke/feature_bc_augmented_no_prev_no_seq_leave_s_curve_out_20e.pt}"
-NPZ="${NPZ:-logs/learning_smoke/feature_bc_augmented_no_prev_no_seq_leave_s_curve_out_20e.npz}"
-PREDICTIONS="${PREDICTIONS:-logs/learning_smoke/feature_bc_augmented_no_prev_no_seq_leave_s_curve_out_20e_s_curve_predictions.csv}"
-PREDICTION_PLOT="${PREDICTION_PLOT:-logs/learning_smoke/feature_bc_augmented_no_prev_no_seq_leave_s_curve_out_20e_s_curve_audit.png}"
-COMPARISON="${COMPARISON:-logs/controller_comparison/s_curve_no_prev_no_seq_npz_comparison.csv}"
-COMPARISON_PLOT="${COMPARISON_PLOT:-logs/controller_comparison/s_curve_no_prev_no_seq_npz_comparison.png}"
+CHECKPOINT="${CHECKPOINT:-logs/learning_smoke/feature_bc_augmented_rejoin_no_prev_no_seq_leave_s_curve_out_20e.pt}"
+NPZ="${NPZ:-logs/learning_smoke/feature_bc_augmented_rejoin_no_prev_no_seq_leave_s_curve_out_20e.npz}"
+PREDICTIONS="${PREDICTIONS:-logs/learning_smoke/feature_bc_augmented_rejoin_no_prev_no_seq_leave_s_curve_out_20e_s_curve_predictions.csv}"
+PREDICTION_PLOT="${PREDICTION_PLOT:-logs/learning_smoke/feature_bc_augmented_rejoin_no_prev_no_seq_leave_s_curve_out_20e_s_curve_audit.png}"
+COMPARISON="${COMPARISON:-logs/controller_comparison/s_curve_rejoin_no_prev_no_seq_npz_comparison.csv}"
+COMPARISON_PLOT="${COMPARISON_PLOT:-logs/controller_comparison/s_curve_rejoin_no_prev_no_seq_npz_comparison.png}"
 EPOCHS="${EPOCHS:-20}"
 BATCH_SIZE="${BATCH_SIZE:-256}"
 PHASE_SAMPLING_WEIGHTS="${PHASE_SAMPLING_WEIGHTS:-}"
 MODE_SAMPLING_WEIGHTS="${MODE_SAMPLING_WEIGHTS:-}"
-RECOVERY_TEACHER="${RECOVERY_TEACHER:-baseline}"
+RECOVERY_TEACHER="${RECOVERY_TEACHER:-rejoin}"
 
 echo "[CS260C] python=$PYTHON_BIN"
 echo "[CS260C] trace=$TRACE"
@@ -52,6 +52,12 @@ fi
   --expect-no-prev-command-features \
   --expect-no-sequence-features \
   --trace "$TRACE"
+
+"$PYTHON_BIN" scripts/audit_teacher_quality_gate.py \
+  --trace "$TRACE" \
+  --require-courses easy,circular_arc,s_curve \
+  --require-phases launch,nominal,off_nominal \
+  --allowed-command-sources teacher
 
 TRAIN_ARGS=(
   --traces "$TRACE"

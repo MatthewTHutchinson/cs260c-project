@@ -323,6 +323,19 @@ per-course, and per-mode errors, plus prediction-vs-target saturation
 percentages so curved-track failures are visible instead of hidden in aggregate
 MSE.
 
+Before spending T4 time, run the stricter teacher-data gate:
+
+```bash
+python scripts/audit_teacher_quality_gate.py \
+  --trace logs/privileged_teacher/trace_augmented_rejoin.csv
+```
+
+This is the current go/no-go check for serious BC data. It catches stale teacher
+logs, missing launch/off-nominal coverage, missing circular/S-curve courses,
+backward lookahead targets, poor off-nominal yaw alignment, excessive command
+saturation, and accidental use of selected sequence/previous-command/privileged
+features.
+
 Use `--exclude-courses` during training and `--include-courses` during
 evaluation for leave-one-course-out checks. The current leave-`s_curve`-out
 result fails badly on the base dataset, but improves after adding randomized

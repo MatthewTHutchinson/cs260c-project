@@ -76,6 +76,9 @@ python scripts/audit_privileged_teacher_dataset.py \
   --trace logs/privileged_teacher/trace.csv \
   --plot \
   --out-dir logs/privileged_teacher/audit
+
+python scripts/audit_teacher_quality_gate.py \
+  --trace logs/privileged_teacher/trace.csv
 ```
 
 This produces a debug-course teacher CSV with legal student features,
@@ -85,10 +88,26 @@ The audit script summarizes bearing/range/command ranges per course and writes
 course-level plots for the path, lookahead targets, bearings, and teacher
 commands. It also reports command saturation percentages so aggressive tracks
 like `s_curve` can be distinguished from broken or over-clipped labels.
+The quality gate is the fail-fast check before T4 training: it verifies required
+courses/phases, `command_source=teacher`, no selected privileged/sequence/prev
+command inputs, gate-center passage, forward lookahead, off-nominal yaw
+alignment, and command saturation limits.
 
 This is not the final trajectory optimizer. It is the first better-than-reactive
 teacher: it flies through gate centers with smooth lookahead and provides labels
 that are much better suited for BC than the current visual-servo controller.
+
+The current default experiment path uses the `rejoin` recovery teacher, not the
+older baseline lookahead teacher:
+
+```bash
+scripts/run_feature_policy_ablation.sh
+```
+
+That wrapper regenerates `logs/privileged_teacher/trace_augmented_rejoin.csv`,
+runs the feature-spec and teacher-quality gates, trains the no-prev/no-sequence
+GRU, exports `.npz`, and compares learned/reactive/teacher commands on the
+held-out S-curve.
 
 Next, upgrade the reference generator:
 
