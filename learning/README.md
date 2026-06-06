@@ -203,6 +203,41 @@ python -m learning.eval_policy \
   --predictions-out logs/learning_smoke/feature_bc_variants_leave_s_curve_out_20e_no_prev_s_curve_predictions.csv
 ```
 
+Run the stricter no-sequence ablation before spending real T4 time. This drops
+`last_gate_passed` and `next_gate_index`, which are tracker beliefs at runtime
+but can be unrealistically perfect in privileged teacher data:
+
+Regenerate `trace_augmented.csv` first if it predates the `frame_fresh` column;
+the audit below intentionally fails when selected trace features are missing.
+
+```bash
+python scripts/audit_learning_feature_spec.py \
+  --no-prev-command-features \
+  --no-sequence-features \
+  --expect-no-prev-command-features \
+  --expect-no-sequence-features \
+  --trace logs/privileged_teacher/trace_augmented.csv
+
+python -m learning.train_bc \
+  --traces logs/privileged_teacher/trace_augmented.csv \
+  --exclude-courses s_curve \
+  --epochs 20 \
+  --batch-size 256 \
+  --no-prev-command-features \
+  --no-sequence-features \
+  --out logs/learning_smoke/feature_bc_augmented_no_prev_no_seq_leave_s_curve_out_20e.pt
+
+python -m learning.eval_policy \
+  --checkpoint logs/learning_smoke/feature_bc_augmented_no_prev_no_seq_leave_s_curve_out_20e.pt \
+  --traces logs/privileged_teacher/trace_augmented.csv \
+  --include-courses s_curve \
+  --predictions-out logs/learning_smoke/feature_bc_augmented_no_prev_no_seq_leave_s_curve_out_20e_s_curve_predictions.csv
+
+python -m learning.export_policy_npz \
+  --checkpoint logs/learning_smoke/feature_bc_augmented_no_prev_no_seq_leave_s_curve_out_20e.pt \
+  --out logs/learning_smoke/feature_bc_augmented_no_prev_no_seq_leave_s_curve_out_20e.npz
+```
+
 Export that checkpoint to a pure NumPy runtime artifact before deploying it in
 the simulator harness:
 

@@ -166,10 +166,12 @@ the current lack of lookahead/trajectory planning.
 Use the project Conda Python:
 
 ```bash
-/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m py_compile algorithm/*.py scripts/*.py
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python -m py_compile algorithm/*.py learning/*.py scripts/*.py
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python scripts/audit_course_alignment.py
 /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python scripts/audit_sign_conventions.py
 /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python scripts/audit_sequence_selection.py
 /Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python scripts/audit_lateral_reacquisition.py
+/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python scripts/audit_learning_feature_spec.py --no-prev-command-features --no-sequence-features --expect-no-prev-command-features --expect-no-sequence-features
 scripts/run_elodin_course_suite.py --courses easy,lateral_soft,low_high,four_gate_straight
 ```
 

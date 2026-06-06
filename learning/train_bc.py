@@ -63,6 +63,14 @@ def main() -> int:
         action="store_true",
         help="Drop previous command inputs for runtime-friendly closed-loop inference.",
     )
+    parser.add_argument(
+        "--no-sequence-features",
+        action="store_true",
+        help=(
+            "Drop last_gate_passed and next_gate_index inputs so the policy cannot "
+            "lean on perfect teacher-side gate sequence labels."
+        ),
+    )
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
@@ -72,11 +80,12 @@ def main() -> int:
     if not traces:
         raise SystemExit("provide --traces or use --demo-synthetic")
 
-    spec = None
-    if args.no_prev_command_features:
-        from learning.datasets import FeatureSpec
+    from learning.datasets import FeatureSpec
 
-        spec = FeatureSpec.default(include_prev_command=False)
+    spec = FeatureSpec.default(
+        include_prev_command=not args.no_prev_command_features,
+        include_sequence_features=not args.no_sequence_features,
+    )
 
     dataset = TraceSequenceDataset(
         traces,
@@ -137,6 +146,7 @@ def main() -> int:
                     "include_courses": args.include_courses or [],
                     "exclude_courses": args.exclude_courses or [],
                     "no_prev_command_features": bool(args.no_prev_command_features),
+                    "no_sequence_features": bool(args.no_sequence_features),
                 },
             )
 

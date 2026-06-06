@@ -115,9 +115,9 @@ def main() -> int:
     model, payload = load_checkpoint(str(args.checkpoint), map_location=device)
     model.to(device)
     sequence_length = int(payload.get("metadata", {}).get("sequence_length", 12))
-    spec = None
-    if payload.get("metadata", {}).get("no_prev_command_features"):
-        spec = FeatureSpec.default(include_prev_command=False)
+    spec = FeatureSpec(
+        feature_names=tuple(payload.get("feature_names", FeatureSpec.default().feature_names))
+    )
     dataset = TraceSequenceDataset(
         args.traces,
         sequence_length=sequence_length,

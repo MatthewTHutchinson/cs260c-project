@@ -197,6 +197,7 @@ def relabel_rows(
         out_row.update(
             {
                 "timestamp_s": f"{t:.6f}",
+                "frame_fresh": row.get("frame_fresh", "1"),
                 "course": course_name,
                 "episode_id": episode_id,
                 "teacher_phase": "closed_loop_relabel",

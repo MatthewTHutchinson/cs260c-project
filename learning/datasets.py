@@ -31,6 +31,10 @@ TEACHER_TARGET_COLUMNS = (
     "teacher_yaw_rate_rad_s",
     "teacher_thrust_norm",
 )
+SEQUENCE_FEATURE_COLUMNS = (
+    "last_gate_passed",
+    "next_gate_index",
+)
 
 BASE_FEATURE_COLUMNS = (
     "frame_fresh",
@@ -128,8 +132,17 @@ class FeatureSpec:
     prefer_teacher_targets: bool = True
 
     @classmethod
-    def default(cls, *, include_prev_command: bool = True) -> "FeatureSpec":
-        names: list[str] = list(BASE_FEATURE_COLUMNS)
+    def default(
+        cls,
+        *,
+        include_prev_command: bool = True,
+        include_sequence_features: bool = True,
+    ) -> "FeatureSpec":
+        names: list[str] = [
+            name
+            for name in BASE_FEATURE_COLUMNS
+            if include_sequence_features or name not in SEQUENCE_FEATURE_COLUMNS
+        ]
         names.extend(f"mode_{mode}" for mode in MODE_NAMES)
         if include_prev_command:
             names.extend(f"prev_{name}" for name in TARGET_COLUMNS)

@@ -42,6 +42,7 @@ from algorithm.course_library import CourseGate, course_by_name, course_names
 
 FIELDNAMES = (
     "timestamp_s",
+    "frame_fresh",
     "course",
     "episode_id",
     "teacher_phase",
@@ -416,6 +417,7 @@ def generate_rows(
         rows.append(
             {
                 "timestamp_s": f"{t:.6f}",
+                "frame_fresh": "1",
                 "course": course_name,
                 "episode_id": episode_id,
                 "teacher_phase": teacher_phase,

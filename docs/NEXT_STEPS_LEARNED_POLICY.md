@@ -341,6 +341,23 @@ runtime rollouts. Previous-command features improve teacher-forced offline MSE,
 but without DAgger/closed-loop data they create a train/runtime mismatch because
 the deployed policy feeds back its own previous predictions.
 
+Also run a stricter checkpoint with `--no-sequence-features`. This drops
+`last_gate_passed` and `next_gate_index`, which are legal only if they come from
+the tracker sequence belief at runtime but can be unrealistically perfect in
+privileged teacher data. Use `scripts/audit_learning_feature_spec.py` as the
+guard before T4 runs. Regenerate old teacher traces first if they predate the
+`frame_fresh` column; missing selected features should fail the audit, not turn
+into silent zeros.
+
+```bash
+python scripts/audit_learning_feature_spec.py \
+  --no-prev-command-features \
+  --no-sequence-features \
+  --expect-no-prev-command-features \
+  --expect-no-sequence-features \
+  --trace logs/privileged_teacher/trace_augmented.csv
+```
+
 Use `scripts/compare_controllers_on_trace.py` as the last offline gate before
 simulator rollout. On the current S-curve trace, the no-prev-command learned
 checkpoint is much closer to the privileged teacher than the reactive
