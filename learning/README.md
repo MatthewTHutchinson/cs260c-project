@@ -404,6 +404,23 @@ held-out canonical S-curve. The next validation step is closed-loop rollout in
 the available local simulator, or, if time is too short, using these offline
 metrics and comparison plots as the final-project evidence.
 
+Closed-loop rejoin rollout result, 2026-06-06:
+
+```text
+pure learned easy rollout:
+  status=DNF, gates=0/3
+  end_lateral_error_m=-12.853730
+
+safety-gated learned with reactive fallback:
+  status=DNF, gates=0/3
+  end_lateral_error_m=13.080810
+```
+
+The safety gate kept the policy closer to the intended flight envelope for the
+first few seconds, but it did not solve closed-loop navigation. Treat this as a
+useful negative result: the policy needs closed-loop failure-state relabeling
+and better recovery references before more T4 training time will matter.
+
 The model can fit the upgraded teacher when S-curve examples are included, but
 it does not generalize to S-curves from straight/soft-curve examples alone.
 Randomized curved teacher data fixes the first generalization failure much more

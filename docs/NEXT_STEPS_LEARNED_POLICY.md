@@ -480,6 +480,31 @@ policy can imitate a better recovery reference on a held-out S-curve without
 previous-command feedback or perfect sequence labels. Closed-loop rollout is the
 next evidence layer when a simulator is available.
 
+Closed-loop rejoin rollout follow-up, 2026-06-06:
+
+```text
+checkpoint=feature_bc_augmented_rejoin_no_prev_no_seq_leave_s_curve_out_20e.npz
+course=easy
+
+pure learned:
+  status=DNF, gates=0/3
+  end_lateral_error_m=-12.853730
+  modes={'detected': 627}
+
+safety-gated learned with reactive fallback:
+  status=DNF, gates=0/3
+  end_lateral_error_m=13.080810
+  modes={'detected': 553, 'commit': 38, 'tracked': 44}
+```
+
+This is the most important current limitation. The safety gate improved the
+first few seconds by keeping the policy inside a narrower feature envelope, but
+it did not turn offline imitation into closed-loop navigation. The learned
+policy still leaves the training corridor, then the perception/control loop
+cannot recover in time. Do not spend T4 budget on larger BC runs until the
+dataset contains closed-loop failure states and the teacher/recovery reference
+can bring those states back to the gate line.
+
 This means the direction is correct but incomplete. The next teacher upgrade is
 closed-loop relabeling: log privileged debug world position from failed Elodin
 rollouts, compute the desired lookahead/minimum-snap correction from that
@@ -560,3 +585,41 @@ official simulator bring-up
   -> CNN detector only if classical CV becomes the bottleneck
   -> VQ1 adapter hardening
 ```
+
+## Research-Aligned Roadmap
+
+The literature points to a hybrid system rather than a one-piece neural network
+as the most credible path:
+
+```text
+FPV frames + IMU/telemetry
+  -> neural or classical gate perception
+  -> gate-relative state / tracker / drift correction
+  -> lookahead reference or local trajectory
+  -> learned or optimized body-rate/thrust controller
+  -> safety supervisor and runtime adapter
+```
+
+For this project, the practical version is:
+
+1. keep the current reactive controller as the closed-loop baseline
+2. add sequence-aware lookahead so curved tracks are not handled gate-by-gate
+3. use privileged geometry only offline to generate high-quality teacher labels
+4. train the feature GRU/MLP on those labels
+5. collect failed closed-loop states and relabel them with the teacher
+6. use DAgger-style aggregation until the learned policy completes easy tracks
+7. only then spend T4 time on PPO or a CNN perception upgrade
+
+The main blockers are not compute. The main blockers are:
+
+- no official simulator logs yet
+- no verified MAVSDK adapter yet
+- local simulator/runtime mismatch with the official VQ1 environment
+- closed-loop drift after small policy errors
+- weak labels for recovery, yaw alignment, and near-gate commit
+- possible perception brittleness once lighting/distractors change
+- limited time to debug a raw-image CNN or pure PPO setup
+
+In other words: the project should use deep learning, but the next deep-learning
+work should be data/relabeling and supervisor-aware imitation first, not a
+larger network trained on the same narrow traces.

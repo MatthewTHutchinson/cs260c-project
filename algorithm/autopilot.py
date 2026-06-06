@@ -33,11 +33,23 @@ class AutonomousRacingPilot:
         controller: Optional[ReactiveGateController] = None,
         learned_controller: Optional[LearnedFeatureController] = None,
         frame_format: str = "bgr",
+        learned_max_abs_bearing_h_rad: float = 0.45,
+        learned_max_abs_bearing_v_rad: float = 0.50,
+        learned_max_distance_m: float = 8.0,
+        learned_min_confidence: float = 0.35,
+        learned_max_abs_lateral_velocity_m_s: float = 2.0,
     ) -> None:
         self.tracker = tracker or build_gate_tracker()
         self.controller = controller or ReactiveGateController()
         self.learned_controller = learned_controller
         self.frame_format = frame_format
+        self.learned_max_abs_bearing_h_rad = float(learned_max_abs_bearing_h_rad)
+        self.learned_max_abs_bearing_v_rad = float(learned_max_abs_bearing_v_rad)
+        self.learned_max_distance_m = float(learned_max_distance_m)
+        self.learned_min_confidence = float(learned_min_confidence)
+        self.learned_max_abs_lateral_velocity_m_s = float(
+            learned_max_abs_lateral_velocity_m_s
+        )
 
     def reset(self) -> None:
         self.tracker.reset()
@@ -65,8 +77,32 @@ class AutonomousRacingPilot:
             timestamp_s=timestamp,
             frame_format=self.frame_format,
         )
-        if self.learned_controller is not None and gate.is_usable:
+        if self.learned_controller is not None and self._learned_is_safe(
+            gate, telemetry
+        ):
             command = self.learned_controller.compute(gate, telemetry)
         else:
             command = self.controller.compute(gate, telemetry)
         return command, gate
+
+    def _learned_is_safe(
+        self,
+        gate: GateEstimate,
+        telemetry: VehicleTelemetry,
+    ) -> bool:
+        """Use learned control only inside the current feature-policy envelope."""
+        if not gate.is_usable:
+            return False
+        if gate.confidence < self.learned_min_confidence:
+            return False
+        if abs(gate.bearing_h_rad) > self.learned_max_abs_bearing_h_rad:
+            return False
+        if abs(gate.bearing_v_rad) > self.learned_max_abs_bearing_v_rad:
+            return False
+        if gate.distance_m is not None and gate.distance_m > self.learned_max_distance_m:
+            return False
+        velocity = telemetry.linear_velocity_m_s
+        if velocity is not None and len(velocity) >= 2:
+            if abs(float(velocity[1])) > self.learned_max_abs_lateral_velocity_m_s:
+                return False
+        return True

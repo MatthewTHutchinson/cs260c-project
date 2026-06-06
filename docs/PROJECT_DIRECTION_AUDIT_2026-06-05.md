@@ -64,6 +64,12 @@ success on lateral, circular, and S-shaped recovery cases.
 - The first learned/relabel closed-loop run still failed badly. On the latest
   audited `easy` learned trace, final lateral error reached 13.82 m. That means
   the learned controller has not yet learned robust lateral/yaw/altitude recovery.
+- The later `rejoin` teacher improved offline held-out S-curve imitation, but
+  the closed-loop rollout still failed `easy`. Pure learned control reached
+  `DNF gates=0/3` with `end_lateral_error_m=-12.853730`; safety-gated learned
+  control with reactive fallback also reached `DNF gates=0/3` with
+  `end_lateral_error_m=13.080810`. This makes closed-loop relabeling and
+  reference design the next bottleneck.
 - Some synthetic teacher tracks are already saturating roll/yaw commands,
   especially S-curve variants. That may be useful stress coverage, but it also
   means the teacher is pushing against actuator limits and should be validated
