@@ -22,6 +22,7 @@ active repo. Older strategy notes should stay out of the current project path.
 - `PATH_PLANNING_NAVIGATION.md`: gate-order navigation, local guidance, search behavior, and VQ1/VQ2 planning split.
 - `NEXT_STEPS_LEARNED_POLICY.md`: T4, minimum-snap, BC/DAgger/PPO, and feature-policy roadmap.
 - `PRIVILEGED_TEACHER_DATA_STRATEGY.md`: how to use simulator truth for expert labels without leaking it into the deployed policy.
+- `PROJECT_DIRECTION_AUDIT_2026-06-05.md`: current direction check, legacy-track quarantine, course-alignment audit, and learned-controller risk assessment.
 - `GCP_T4_HANDOFF.md`: cloud VM setup and training handoff instructions.
 
 ## Reference
