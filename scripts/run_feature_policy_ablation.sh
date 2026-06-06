@@ -7,7 +7,14 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-PYTHON_BIN="${PROJECT_PYTHON:-/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python}"
+DEFAULT_PROJECT_PYTHON="/Users/matthewhutchinson/miniconda3/envs/cs260c-project/bin/python"
+if [[ -n "${PROJECT_PYTHON:-}" ]]; then
+  PYTHON_BIN="$PROJECT_PYTHON"
+elif [[ -x "$DEFAULT_PROJECT_PYTHON" ]]; then
+  PYTHON_BIN="$DEFAULT_PROJECT_PYTHON"
+else
+  PYTHON_BIN="python"
+fi
 
 # macOS conda can load duplicate OpenMP runtimes when torch/matplotlib/numpy are
 # imported together. Linux/T4 runs normally with this value unused.

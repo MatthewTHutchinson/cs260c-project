@@ -136,7 +136,8 @@ scripts/run_feature_policy_ablation.sh
 That wrapper regenerates the `rejoin` privileged teacher dataset, runs the
 teacher-quality and legal-feature gates, trains the deployable no-prev/no-sequence
 GRU baseline, exports `.npz`, and compares learned/reactive/teacher commands on
-the held-out S-curve.
+the held-out S-curve. On the Mac it uses the known Conda interpreter when
+available; on the T4 it falls back to the active `python` from the selected env.
 
 ## Project Rule
 
