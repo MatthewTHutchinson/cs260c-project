@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from dataclasses import dataclass
 import math
 import os
 import sys
@@ -39,10 +40,26 @@ if str(REPO_ROOT) not in sys.path:
 import numpy as np
 
 from algorithm.course_library import CourseGate, course_by_name, course_names
-from scripts.generate_privileged_teacher_dataset import FIELDNAMES, bearing_to_gate, clamp_command, yaw_to_matrix
+from scripts.generate_privileged_teacher_dataset import (
+    FIELDNAMES,
+    bearing_to_gate,
+    clamp_command,
+    hermite_state,
+    recovery_command_from_state,
+    tangent_at,
+    yaw_to_matrix,
+)
 
 
 USABLE_MODES = {"detected", "tracked", "commit"}
+
+
+@dataclass(frozen=True)
+class ReferenceSample:
+    position: np.ndarray
+    velocity_world: np.ndarray
+    gate: CourseGate
+    cumulative_distance_m: float
 
 
 def as_float(row: dict[str, str], key: str, default: float = math.nan) -> float:
@@ -98,6 +115,103 @@ def teacher_target(gate: CourseGate, lookahead_m: float) -> np.ndarray:
     return gate.center + gate.normal_enu * lookahead_m
 
 
+def build_reference_samples(
+    gates: tuple[CourseGate, ...],
+    *,
+    speed_m_s: float,
+    samples_per_segment: int,
+) -> list[ReferenceSample]:
+    start = np.asarray([0.0, 0.0, 1.8], dtype=np.float64)
+    points = [start, *[gate.center for gate in gates]]
+    tangents = [tangent_at(points, i, speed_m_s) for i in range(len(points))]
+    samples: list[ReferenceSample] = []
+    cumulative_distance = 0.0
+    last_position: np.ndarray | None = None
+
+    for seg_idx in range(len(points) - 1):
+        p0 = points[seg_idx]
+        p1 = points[seg_idx + 1]
+        gate = gates[min(seg_idx, len(gates) - 1)]
+        segment_length = float(np.linalg.norm(p1 - p0))
+        duration_s = max(0.2, segment_length / max(speed_m_s, 1e-3))
+        for j in range(samples_per_segment):
+            u = j / samples_per_segment
+            position, velocity_world, _acceleration_world = hermite_state(
+                p0=p0,
+                p1=p1,
+                v0=tangents[seg_idx],
+                v1=tangents[seg_idx + 1],
+                u=u,
+                duration_s=duration_s,
+            )
+            if last_position is not None:
+                cumulative_distance += float(np.linalg.norm(position - last_position))
+            samples.append(
+                ReferenceSample(
+                    position=position,
+                    velocity_world=velocity_world,
+                    gate=gate,
+                    cumulative_distance_m=cumulative_distance,
+                )
+            )
+            last_position = position
+
+    if last_position is not None:
+        final_gate = gates[-1]
+        final_position = final_gate.center
+        cumulative_distance += float(np.linalg.norm(final_position - last_position))
+        samples.append(
+            ReferenceSample(
+                position=final_position,
+                velocity_world=tangents[-1],
+                gate=final_gate,
+                cumulative_distance_m=cumulative_distance,
+            )
+        )
+    return samples
+
+
+def nearest_reference_index(
+    reference_samples: list[ReferenceSample],
+    *,
+    position: np.ndarray,
+    gate_index: int,
+) -> int:
+    candidate_indices = [
+        idx for idx, sample in enumerate(reference_samples) if sample.gate.index == gate_index
+    ]
+    if not candidate_indices:
+        candidate_indices = list(range(len(reference_samples)))
+    best_idx = candidate_indices[0]
+    best_dist = float("inf")
+    for idx in candidate_indices:
+        sample = reference_samples[idx]
+        delta = sample.position - position
+        dist = float(np.linalg.norm(delta))
+        if dist < best_dist:
+            best_idx = idx
+            best_dist = dist
+    return best_idx
+
+
+def lookahead_reference(
+    reference_samples: list[ReferenceSample],
+    *,
+    start_idx: int,
+    lookahead_m: float,
+) -> ReferenceSample:
+    target_distance = reference_samples[start_idx].cumulative_distance_m + lookahead_m
+    lo = start_idx
+    hi = len(reference_samples) - 1
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if reference_samples[mid].cumulative_distance_m < target_distance:
+            lo = mid + 1
+        else:
+            hi = mid
+    return reference_samples[lo]
+
+
 def relabel_command(
     *,
     position: np.ndarray,
@@ -106,16 +220,37 @@ def relabel_command(
     gate: CourseGate,
     lookahead_m: float,
     observed_bearing_h: float,
+    teacher: str,
+    reference_position: np.ndarray | None = None,
+    reference_velocity_world: np.ndarray | None = None,
+    rejoin_target: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, float]:
     target = teacher_target(gate, lookahead_m)
-    target_body = yaw_to_matrix(yaw_rad).T @ (target - position)
-    velocity_body = yaw_to_matrix(yaw_rad).T @ velocity_world
     bearing_h, _bearing_v, distance, _lateral, _vertical = bearing_to_gate(
         position=position,
         yaw_rad=yaw_rad,
         gate=gate,
         camera_tilt_up_rad=math.radians(20.0),
     )
+    if teacher == "rejoin":
+        if (
+            reference_position is None
+            or reference_velocity_world is None
+            or rejoin_target is None
+        ):
+            raise ValueError("rejoin relabeling requires reference state and target")
+        command = recovery_command_from_state(
+            position=position,
+            yaw=yaw_rad,
+            velocity_world=velocity_world,
+            reference_position=reference_position,
+            reference_velocity_world=reference_velocity_world,
+            rejoin_target=rejoin_target,
+        )
+        return command, rejoin_target, distance
+
+    target_body = yaw_to_matrix(yaw_rad).T @ (target - position)
+    velocity_body = yaw_to_matrix(yaw_rad).T @ velocity_world
     heading_error = math.atan2(float(target_body[1]), max(1.0, float(target_body[0])))
     altitude_error = float(gate.center[2] - position[2])
 
@@ -146,8 +281,16 @@ def relabel_rows(
     lookahead_m: float,
     min_confidence: float,
     max_past_gate_m: float,
+    teacher: str,
+    reference_speed_m_s: float,
+    reference_samples_per_segment: int,
 ) -> list[dict[str, str]]:
     gates = course_by_name(course_name)
+    reference_samples = build_reference_samples(
+        gates,
+        speed_m_s=reference_speed_m_s,
+        samples_per_segment=reference_samples_per_segment,
+    )
     out: list[dict[str, str]] = []
     prev_command = np.asarray([0.0, 0.0, 0.0, 0.55], dtype=np.float64)
     last_velocity: np.ndarray | None = None
@@ -184,6 +327,21 @@ def relabel_rows(
         past_gate_m = float((position - gate.center) @ gate.normal_enu)
         if past_gate_m > max_past_gate_m:
             continue
+        reference_idx = nearest_reference_index(
+            reference_samples,
+            position=position,
+            gate_index=gate.index,
+        )
+        reference_sample = reference_samples[reference_idx]
+        off_reference_m = float(np.linalg.norm(position - reference_sample.position))
+        rejoin_lookahead_m = float(
+            np.clip(2.4 + 0.35 * off_reference_m, 2.2, lookahead_m)
+        )
+        rejoin_sample = lookahead_reference(
+            reference_samples,
+            start_idx=reference_idx,
+            lookahead_m=rejoin_lookahead_m,
+        )
         command, target, distance = relabel_command(
             position=position,
             yaw_rad=yaw_rad,
@@ -191,6 +349,10 @@ def relabel_rows(
             gate=gate,
             lookahead_m=lookahead_m,
             observed_bearing_h=as_float(row, "bearing_h_rad", math.nan),
+            teacher=teacher,
+            reference_position=reference_sample.position,
+            reference_velocity_world=reference_sample.velocity_world,
+            rejoin_target=rejoin_sample.position,
         )
 
         out_row = {name: "" for name in FIELDNAMES}
@@ -200,7 +362,7 @@ def relabel_rows(
                 "frame_fresh": row.get("frame_fresh", "1"),
                 "course": course_name,
                 "episode_id": episode_id,
-                "teacher_phase": "closed_loop_relabel",
+                "teacher_phase": f"closed_loop_{teacher}",
                 "last_gate_passed": str(as_int(row, "last_gate_passed", -1)),
                 "next_gate_index": str(gate.index),
                 "mode": mode,
@@ -261,6 +423,14 @@ def main() -> int:
     parser.add_argument("--course", choices=course_names(), required=True)
     parser.add_argument("--episode-id")
     parser.add_argument("--lookahead-m", type=float, default=3.5)
+    parser.add_argument(
+        "--teacher",
+        choices=("baseline", "rejoin"),
+        default="rejoin",
+        help="Offline relabeling teacher. 'rejoin' uses a local reference-line rejoin target.",
+    )
+    parser.add_argument("--reference-speed-m-s", type=float, default=6.0)
+    parser.add_argument("--reference-samples-per-segment", type=int, default=120)
     parser.add_argument("--min-confidence", type=float, default=0.05)
     parser.add_argument(
         "--max-past-gate-m",
@@ -279,6 +449,9 @@ def main() -> int:
         lookahead_m=args.lookahead_m,
         min_confidence=args.min_confidence,
         max_past_gate_m=args.max_past_gate_m,
+        teacher=args.teacher,
+        reference_speed_m_s=args.reference_speed_m_s,
+        reference_samples_per_segment=args.reference_samples_per_segment,
     )
     if not out_rows:
         raise SystemExit("no rows relabeled; check trace modes/confidence/debug-world columns")
@@ -293,6 +466,7 @@ def main() -> int:
     print(f"dataset={args.out}")
     print(f"course={args.course}")
     print(f"episode_id={episode_id}")
+    print(f"teacher={args.teacher}")
     print(f"rows_in={len(rows)}")
     print(f"rows_relabelled={len(out_rows)}")
     print("student_inputs=original FPV/tracker/telemetry trace columns")

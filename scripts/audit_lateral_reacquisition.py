@@ -257,7 +257,13 @@ def main() -> int:
         print(line)
 
     failures: list[str] = []
-    left, center, right, no_attitude, reacquire, top = synthetic
+    by_label = {str(row["label"]): row for row in synthetic}
+    left = by_label["left_gate"]
+    center = by_label["center_body_aligned"]
+    right = by_label["right_gate"]
+    no_attitude = by_label["optical_center_no_attitude"]
+    reacquire = by_label["optical_center_pitched_down"]
+    top = by_label["top_edge_gate"]
     if float(right["yaw"]) <= 0.0 or int(right["rc_yaw"]) <= 1500:
         failures.append("right gate should command positive yaw / RC yaw above center")
     if float(right["roll"]) <= 0.0 or int(right["rc_roll"]) <= 1500:

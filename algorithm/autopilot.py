@@ -50,12 +50,14 @@ class AutonomousRacingPilot:
         self.learned_max_abs_lateral_velocity_m_s = float(
             learned_max_abs_lateral_velocity_m_s
         )
+        self.last_command_source = "reactive"
 
     def reset(self) -> None:
         self.tracker.reset()
         self.controller.reset()
         if self.learned_controller is not None:
             self.learned_controller.reset()
+        self.last_command_source = "reactive"
 
     def update(
         self,
@@ -81,8 +83,14 @@ class AutonomousRacingPilot:
             gate, telemetry
         ):
             command = self.learned_controller.compute(gate, telemetry)
+            self.last_command_source = "learned"
         else:
             command = self.controller.compute(gate, telemetry)
+            self.last_command_source = (
+                "reactive_fallback"
+                if self.learned_controller is not None
+                else "reactive"
+            )
         return command, gate
 
     def _learned_is_safe(

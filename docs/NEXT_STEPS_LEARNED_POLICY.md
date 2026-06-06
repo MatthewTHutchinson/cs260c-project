@@ -524,6 +524,36 @@ course. It fit the relabeled failure trace offline (`mse=0.00120523`) but the
 gate line. The audit showed roll correction had the right sign, while yaw and
 altitude/thrust recovery still need a better teacher.
 
+The second relabel iteration moved the relabeler to the same path-rejoin idea
+used by the synthetic `rejoin` teacher:
+
+```bash
+python scripts/relabel_closed_loop_trace.py \
+  --trace logs/elodin_learned_rejoin_guard_smoke/vq1_pinhole/easy/trace.csv \
+  --course easy \
+  --teacher rejoin \
+  --episode-id easy:closed_loop:rejoin_guard_001 \
+  --out logs/privileged_teacher/closed_loop_relabels/easy_rejoin_guard_001_rejoin.csv
+```
+
+```text
+rows_relabelled=312
+closed_loop_relabel_mse=0.00080114
+heldout_s_curve_mse=0.00213601
+10s_easy_rollout=DNF gates=0/3 end_lateral_error_m=12.440920
+10s_source_logging=DNF gates=0/3 command_sources={'reactive_fallback': 528, 'learned': 131}
+6s_source_logging=DNF gates=1/3 gate0_pass_t=5.25
+```
+
+This is a small improvement over the previous guarded learned rollout
+(`end_lateral_error_m=13.080810`), but still not a completion result. A naive
+lateral-velocity recovery rule was also tested and made the miss worse, so it
+was not kept. The next local step is to collect several diverse failed rollouts,
+relabel them with the rejoin/reference teacher, and use command-source logging
+to separate learned-policy failures from fallback/supervisor failures. The
+latest 10 s failure was mostly `reactive_fallback`, so the fallback/supervisor
+boundary is part of the problem.
+
 ## Robustness Work
 
 Randomization should be added before trusting learned-policy results:

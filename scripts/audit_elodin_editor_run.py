@@ -105,6 +105,21 @@ def trace_progress(rows: list[dict[str, str]]) -> dict[str, int] | None:
     return progress or None
 
 
+def command_source_counts(
+    rows: list[dict[str, str]],
+) -> tuple[Counter[str], dict[str, Counter[str]]]:
+    sources: Counter[str] = Counter()
+    by_mode: dict[str, Counter[str]] = {}
+    for row in rows:
+        source = row.get("command_source", "")
+        if not source:
+            continue
+        mode = row.get("mode", "")
+        sources[source] += 1
+        by_mode.setdefault(mode, Counter())[source] += 1
+    return sources, by_mode
+
+
 def classify(
     rows: list[dict[str, str]],
     fresh_frames: int,
@@ -200,6 +215,13 @@ def main() -> None:
         if progress is not None:
             for key, value in progress.items():
                 print(f"{key}={value}")
+        sources, by_mode = command_source_counts(rows)
+        if sources:
+            print(f"command_sources={dict(sources)}")
+            print(
+                "command_sources_by_mode="
+                f"{ {mode: dict(counts) for mode, counts in by_mode.items()} }"
+            )
     print(f"verdict={verdict}")
 
     log_lines = interesting_log_lines(args.log)

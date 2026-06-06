@@ -70,6 +70,10 @@ success on lateral, circular, and S-shaped recovery cases.
   control with reactive fallback also reached `DNF gates=0/3` with
   `end_lateral_error_m=13.080810`. This makes closed-loop relabeling and
   reference design the next bottleneck.
+- Command-source logging now shows the failure is not just "the neural policy
+  is bad." On the latest 10 s `easy` failure, the trace had
+  `reactive_fallback=528` rows and `learned=131` rows. The fallback/supervisor
+  boundary is therefore part of the navigation problem.
 - Some synthetic teacher tracks are already saturating roll/yaw commands,
   especially S-curve variants. That may be useful stress coverage, but it also
   means the teacher is pushing against actuator limits and should be validated

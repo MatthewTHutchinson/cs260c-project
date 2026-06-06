@@ -498,6 +498,7 @@ Relabel a failed Elodin rollout after applying the debug-world trace patch:
 python scripts/relabel_closed_loop_trace.py \
   --trace logs/elodin_learned_relabel_seed/vq1_pinhole/easy/trace.csv \
   --course easy \
+  --teacher rejoin \
   --episode-id easy:closed_loop:relabel_seed_001 \
   --out logs/privileged_teacher/closed_loop_relabels/easy_relabel_seed_001.csv
 
@@ -510,17 +511,18 @@ Train with the nominal/augmented teacher plus the relabeled failure episode:
 
 ```bash
 python -m learning.train_bc \
-  --traces logs/privileged_teacher/trace_augmented.csv \
+  --traces logs/privileged_teacher/trace_augmented_rejoin.csv \
            logs/privileged_teacher/closed_loop_relabels/easy_relabel_seed_001.csv \
   --exclude-courses s_curve \
   --epochs 20 \
   --batch-size 256 \
   --no-prev-command-features \
-  --out logs/learning_smoke/feature_bc_augmented_plus_relabel_20e_no_prev.pt
+  --no-sequence-features \
+  --out logs/learning_smoke/feature_bc_augmented_rejoin_plus_relabel_20e_no_prev_no_seq.pt
 
 python -m learning.export_policy_npz \
-  --checkpoint logs/learning_smoke/feature_bc_augmented_plus_relabel_20e_no_prev.pt \
-  --out logs/learning_smoke/feature_bc_augmented_plus_relabel_20e_no_prev.npz
+  --checkpoint logs/learning_smoke/feature_bc_augmented_rejoin_plus_relabel_20e_no_prev_no_seq.pt \
+  --out logs/learning_smoke/feature_bc_augmented_rejoin_plus_relabel_20e_no_prev_no_seq.npz
 ```
 
 First relabel iteration, 2026-06-04:
@@ -540,6 +542,56 @@ on the audited rollout, but yaw/altitude recovery are still wrong enough that
 the learned controller misses right and flies low. The next relabeling teacher
 should reduce yaw authority during large lateral errors and raise recovery
 thrust/altitude hold before another T4-scale training run.
+
+Second relabel iteration, 2026-06-06:
+
+```text
+source_rollout=logs/elodin_learned_rejoin_guard_smoke/vq1_pinhole/easy/trace.csv
+teacher=rejoin
+closed_loop_relabel_rows=312
+
+baseline_relabel:
+  roll_mean=+0.055594
+  yaw_mean=+0.141452
+
+rejoin_relabel:
+  roll_mean=-0.065512
+  yaw_mean=-0.128213
+  audit command_saturation_pct roll=1.0 yaw=0.0
+
+BC with trace_augmented_rejoin + rejoin relabel:
+  best_val_mse=0.00249412
+  heldout_s_curve_mse=0.00213601
+  closed_loop_relabel_mse=0.00080114
+
+10s_easy_rollout:
+  status=DNF gates=0/3
+  end_lateral_error_m=12.440920
+  prior_rejoin_guard_end_lateral_error_m=13.080810
+
+10s_source_logging_rollout:
+  status=DNF gates=0/3
+  end_lateral_error_m=8.343610
+  command_sources={'reactive_fallback': 528, 'learned': 131}
+  command_sources_by_mode={'detected': {'reactive_fallback': 528, 'learned': 107}, 'commit': {'learned': 24}}
+
+6s_source_logging_rollout:
+  status=DNF gates=1/3
+  gate0_pass_t=5.25
+  gate0_pass_position=(10.00, 0.62, 1.06)
+
+naive_lateral_velocity_recovery_controller:
+  status=DNF gates=0/3
+  result=worse, not kept
+```
+
+Interpretation: the rejoin relabeler now creates the correct sign of recovery
+labels for this failure trace, and the GRU can fit those labels. One failure
+episode is not enough to close the loop. Source logging shows the 10 s failure
+is mostly owned by `reactive_fallback`, which means the supervisor/fallback
+boundary is now a real bottleneck too. The next useful work is multiple
+closed-loop relabel episodes plus source-aware fallback design, not a quick
+visual-servo gain patch.
 
 The runtime wrapper lives in `algorithm/learned_controller.py`. It is optional:
 `AutonomousRacingPilot` uses it only when one is supplied and the current gate
