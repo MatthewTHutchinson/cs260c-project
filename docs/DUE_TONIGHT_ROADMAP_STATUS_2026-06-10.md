@@ -365,3 +365,83 @@ behavior, not simply add more epochs:
 3. reduce aggressive lateral/yaw commands before the Betaflight adapter
 4. rerun short closed-loop validation before accepting the checkpoint
 ```
+
+## Corridor Curriculum Follow-Up - 2026-06-10 Late Evening
+
+The next step implemented the first two fixes above:
+
+```text
+scripts/generate_privileged_teacher_dataset.py
+  added teacher_phase=corridor for first-gate approach recovery
+
+scripts/relabel_closed_loop_trace.py
+  added allowed-state-command-source and max-reference-error filters
+
+scripts/relabel_curve_stress_rollouts.sh
+  now defaults to learned-only relabel states, max_reference_error_m=3.0,
+  max_past_gate_m=1.0
+
+scripts/run_curve_stress_corridor_ablation.sh
+  repeatable hard-curve corridor curriculum experiment
+```
+
+The corridor curriculum generated and passed audit:
+
+```text
+trace=logs/privileged_teacher/trace_curve_stress_rejoin_corridor.csv
+rows=25812
+courses=34
+phases=corridor:5712, launch:816, nominal:16020, off_nominal:3264
+lookahead_forward_p1_m=0.648
+backward_pct=0.00
+verdict=PASS
+```
+
+Offline held-out hard-curve result:
+
+```text
+checkpoint=logs/learning_smoke/feature_bc_curve_stress_rejoin_corridor_no_prev_no_seq_leave_hard_s_curve_out_20e.pt
+npz=logs/learning_smoke/feature_bc_curve_stress_rejoin_corridor_no_prev_no_seq_leave_hard_s_curve_out_20e.npz
+best_val_mse=0.00283223
+heldout_hard_s_curve_rand_000_mse=0.00482819
+learned_vs_teacher_mse=0.00474000
+reactive_vs_teacher_mse=0.21253501
+phase=corridor learned_vs_teacher_mse=0.00527995
+phase=launch learned_vs_teacher_mse=0.00015365
+```
+
+Safer relabel filtering on the prior closed-loop traces now keeps:
+
+```text
+circular_arc: rows_relabelled=220, allowed_state_command_sources=learned
+s_curve:      rows_relabelled=277, allowed_state_command_sources=learned
+```
+
+Short closed-loop check with the corridor checkpoint:
+
+```text
+logs/elodin_curve_stress_corridor_validation/summary.csv
+vq1_pinhole/s_curve: NO_SUMMARY, timed_out=True, trace to 7.29 s
+
+trace rows=449
+fresh FPV rows=173
+max last_gate_passed=-1
+
+position at 5.0 s: ( 8.73, -1.00, 1.05) m
+position at 7.0 s: (20.87, -2.53, 1.19) m
+```
+
+Comparison against the previous DAgger validation checkpoint:
+
+```text
+previous relabel checkpoint at 7.0 s: y=-4.77 m
+new corridor checkpoint at 7.0 s:    y=-2.53 m
+```
+
+Interpretation: the corridor data moved the policy in the right direction by
+shrinking the first-gate lateral miss, but it still does not pass gate 0. This
+keeps PPO out of scope for the immediate next step. The next planned fix is to
+reduce the learned command authority before the Betaflight adapter and rerun
+the same 8 s `s_curve` validation. Wider FOV and harder curvy tracks remain
+valuable, but the current failure is not search-mode loss; it is lateral
+tracking and command realization while the gate is still detected.

@@ -27,6 +27,9 @@ RELABEL_OUT_DIR="${RELABEL_OUT_DIR:-logs/privileged_teacher/closed_loop_relabels
 TRAIN_AFTER_RELABEL="${TRAIN_AFTER_RELABEL:-1}"
 REQUIRE_TRACES="${REQUIRE_TRACES:-1}"
 RUN_NAME="${RUN_NAME:-feature_bc_curve_stress_rejoin_plus_relabels_no_prev_no_seq_20e}"
+RELABEL_ALLOWED_STATE_COMMAND_SOURCES="${RELABEL_ALLOWED_STATE_COMMAND_SOURCES:-learned}"
+RELABEL_MAX_REFERENCE_ERROR_M="${RELABEL_MAX_REFERENCE_ERROR_M:-3.0}"
+RELABEL_MAX_PAST_GATE_M="${RELABEL_MAX_PAST_GATE_M:-1.0}"
 
 # hard_s_curve_rand_000 is the offline held-out hard curve from the curve-stress
 # teacher dataset. We keep evaluating it during relabel training to catch
@@ -68,6 +71,9 @@ for profile in "${PROFILE_ARRAY[@]}"; do
       --trace "$trace" \
       --course "$course" \
       --teacher rejoin \
+      --allowed-state-command-sources "$RELABEL_ALLOWED_STATE_COMMAND_SOURCES" \
+      --max-reference-error-m "$RELABEL_MAX_REFERENCE_ERROR_M" \
+      --max-past-gate-m "$RELABEL_MAX_PAST_GATE_M" \
       --episode-id "${course}:closed_loop:curve_stress_${profile}" \
       --out "$out"
     RELABEL_PATHS+=("$out")

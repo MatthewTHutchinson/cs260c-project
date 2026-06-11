@@ -312,7 +312,7 @@ index 4a5df72..13b9dbe 100644
  # Index of the LAST gate the drone has crossed; -1 before any pass.
  # external_control so the post_step gate-tracker can write to it.
  LastGatePassed = ty.Annotated[
-@@ -106,12 +160,10 @@ class GateProgress(el.Archetype):
+@@ -106,12 +161,10 @@ class GateProgress(el.Archetype):
  # file just lives in `assets/` and is referenced by name.
  GATE_ASSET = "gate.glb"
  
@@ -329,7 +329,7 @@ index 4a5df72..13b9dbe 100644
  
  
  def gate_name(index: int) -> str:
-@@ -164,7 +216,7 @@ def schematic_for(course: Tuple[Gate, ...]) -> str:
+@@ -164,7 +217,7 @@ def schematic_for(course: Tuple[Gate, ...]) -> str:
      for g in course:
          blocks.append(
              f"    object_3d {gate_name(g.index)}.world_pos {{\n"
@@ -338,7 +338,7 @@ index 4a5df72..13b9dbe 100644
              f"    }}"
          )
      return "\n".join(blocks)
-@@ -179,8 +231,8 @@ def detect_gate_pass(
+@@ -179,8 +232,8 @@ def detect_gate_pass(
      """Return the index of the next gate that was just crossed, else None.
  
      A pass requires:
@@ -349,7 +349,7 @@ index 4a5df72..13b9dbe 100644
      """
      next_idx = last_gate_passed + 1
      if next_idx >= len(course):
-@@ -190,14 +242,26 @@ def detect_gate_pass(
+@@ -190,14 +243,26 @@ def detect_gate_pass(
      px, py, pz = prev_pos
      cx, cy, cz = curr_pos
      half = GATE_INNER_W / 2.0
@@ -378,7 +378,7 @@ index 4a5df72..13b9dbe 100644
      course: Tuple[Gate, ...],
      last_gate_passed: int,
      pass_times: list,
-@@ -217,7 +281,7 @@ def print_summary(
+@@ -217,7 +282,7 @@ def print_summary(
          f"{pass_times[i]:.2f}" if i < n_passed else "--" for i in range(n)
      )
      line = (
@@ -1706,10 +1706,10 @@ index ddc6bce..60787d7 100644
  ]
 diff --git a/solver/cs260c_pilot.py b/solver/cs260c_pilot.py
 new file mode 100644
-index 0000000..c3cee00
+index 0000000..4566ad4
 --- /dev/null
 +++ b/solver/cs260c_pilot.py
-@@ -0,0 +1,352 @@
+@@ -0,0 +1,382 @@
 +"""CS 260C perception-guided racing pilot for the Elodin harness.
 +
 +This solver deliberately ignores Elodin's world pose. It consumes only the FPV
@@ -1756,6 +1756,23 @@ index 0000000..c3cee00
 +
 +TAKEOFF_THROTTLE = 1300
 +
++
++def _env_float(name: str, default: float) -> float:
++    raw = os.environ.get(name)
++    if raw is None:
++        return default
++    try:
++        return float(raw)
++    except ValueError:
++        return default
++
++
++RC_ROLL_SCALE = _env_float("CS260C_BETAFLIGHT_ROLL_SCALE", 350.0)
++RC_PITCH_SCALE = _env_float("CS260C_BETAFLIGHT_PITCH_SCALE", 350.0)
++RC_YAW_SCALE = _env_float("CS260C_BETAFLIGHT_YAW_SCALE", 350.0)
++RC_THROTTLE_SCALE = _env_float("CS260C_BETAFLIGHT_THROTTLE_SCALE", 1000.0)
++
++
 +def _build_pilot() -> AutonomousRacingPilot:
 +    profile = get_camera_profile()
 +    detector_config = detector_config_from_env(camera_profile=profile.name)
@@ -1789,6 +1806,11 @@ index 0000000..c3cee00
 +    print(
 +        "[CS260C] detector backend: "
 +        f"{detector_config.kind} ({type(tracker.detector).__name__})"
++    )
++    print(
++        "[CS260C] Betaflight RC scales: "
++        f"roll={RC_ROLL_SCALE:g} pitch={RC_PITCH_SCALE:g} "
++        f"yaw={RC_YAW_SCALE:g} throttle={RC_THROTTLE_SCALE:g}"
 +    )
 +    return AutonomousRacingPilot(
 +        tracker=tracker,
@@ -2054,7 +2076,13 @@ index 0000000..c3cee00
 +        _telemetry(update),
 +        timestamp_s=float(update.t),
 +    )
-+    rc = to_betaflight_rc_fields(command)
++    rc = to_betaflight_rc_fields(
++        command,
++        roll_scale=RC_ROLL_SCALE,
++        pitch_scale=RC_PITCH_SCALE,
++        yaw_scale=RC_YAW_SCALE,
++        throttle_scale=RC_THROTTLE_SCALE,
++    )
 +    _trace(update, gate, command, rc)
 +
 +    return RCCommand(

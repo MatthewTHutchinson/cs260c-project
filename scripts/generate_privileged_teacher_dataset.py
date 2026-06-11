@@ -377,6 +377,9 @@ def generate_rows(
     lookahead_m: float,
     camera_tilt_up_rad: float,
     launch_samples: int,
+    corridor_episodes: int,
+    corridor_length: int,
+    corridor_max_lateral_offset_m: float,
     off_nominal_episodes: int,
     off_nominal_length: int,
     recovery_teacher: str,
@@ -596,6 +599,95 @@ def generate_rows(
                 command=command,
             )
 
+    if corridor_episodes > 0:
+        if corridor_length < 2:
+            raise ValueError("corridor_length must be >= 2")
+        first_gate_indices = [
+            idx
+            for idx, sample in enumerate(samples)
+            if isinstance(sample["gate"], CourseGate) and sample["gate"].index == 0
+        ]
+        if not first_gate_indices:
+            raise ValueError(f"course {course_name!r} has no first-gate approach samples")
+        max_start_offset = max(1, len(first_gate_indices) - corridor_length)
+        for episode_idx in range(corridor_episodes):
+            start_offset = int(rng.integers(0, max_start_offset))
+            lateral_offset = float(
+                rng.uniform(-corridor_max_lateral_offset_m, corridor_max_lateral_offset_m)
+            )
+            if abs(lateral_offset) < 0.55:
+                lateral_offset = math.copysign(0.55, lateral_offset if lateral_offset else 1.0)
+            vertical_offset = float(rng.uniform(-0.28, 0.28))
+            yaw_offset = float(rng.uniform(-0.18, 0.18))
+            lateral_velocity = float(rng.uniform(-0.9, 0.9))
+            vertical_velocity = float(rng.uniform(-0.25, 0.25))
+            episode_id = f"{course_name}:corridor:{episode_idx:03d}"
+            for j in range(corridor_length):
+                sample_idx = first_gate_indices[min(start_offset + j, len(first_gate_indices) - 1)]
+                sample = samples[sample_idx]
+                gate = sample["gate"]
+                position_ref = sample["position"]
+                velocity_ref = sample["velocity_world"]
+                acceleration_ref = sample["acceleration_world"]
+                yaw_ref = sample["yaw"]
+                heading_rate = sample["heading_rate"]
+                t_ref = sample["timestamp_s"]
+                assert isinstance(gate, CourseGate)
+                assert isinstance(position_ref, np.ndarray)
+                assert isinstance(velocity_ref, np.ndarray)
+                assert isinstance(acceleration_ref, np.ndarray)
+                assert isinstance(yaw_ref, float)
+                assert isinstance(heading_rate, float)
+                assert isinstance(t_ref, float)
+
+                decay = 1.0 - j / max(1, corridor_length - 1)
+                body_offset = np.asarray(
+                    [0.0, lateral_offset * decay, vertical_offset * decay],
+                    dtype=np.float64,
+                )
+                body_velocity_offset = np.asarray(
+                    [
+                        0.0,
+                        lateral_velocity * decay - 0.85 * lateral_offset,
+                        vertical_velocity * decay - 0.35 * vertical_offset,
+                    ],
+                    dtype=np.float64,
+                )
+                yaw = yaw_ref + yaw_offset * decay
+                position = position_ref + yaw_to_matrix(yaw_ref) @ body_offset
+                velocity_world = velocity_ref + yaw_to_matrix(yaw_ref) @ body_velocity_offset
+                acceleration_world = acceleration_ref + yaw_to_matrix(yaw_ref) @ np.asarray(
+                    [0.0, -0.50 * lateral_offset * decay, -0.25 * vertical_offset * decay],
+                    dtype=np.float64,
+                )
+                offtrack_m = float(np.linalg.norm(body_offset[1:]))
+                rejoin_target = lookahead_for_sample(
+                    sample_idx,
+                    lookahead_override_m=float(np.clip(2.2 + 0.30 * offtrack_m, 2.2, lookahead_m)),
+                )
+                command = recovery_command_from_state(
+                    position=position,
+                    yaw=yaw,
+                    velocity_world=velocity_world,
+                    reference_position=position_ref,
+                    reference_velocity_world=velocity_ref,
+                    rejoin_target=rejoin_target,
+                )
+                append_row(
+                    episode_id=episode_id,
+                    teacher_phase="corridor",
+                    sample_idx=sample_idx,
+                    t=float(t_ref + 0.002 * (episode_idx + 1)),
+                    gate=gate,
+                    position=position,
+                    velocity_world=velocity_world,
+                    acceleration_world=acceleration_world,
+                    yaw=yaw,
+                    heading_rate=heading_rate - 0.45 * yaw_offset * decay,
+                    command=command,
+                    target_override=rejoin_target,
+                )
+
     for sample_idx, sample in enumerate(samples):
         gate = sample["gate"]
         position = sample["position"]
@@ -730,6 +822,9 @@ def main() -> int:
     parser.add_argument("--random-hard-s-curve-variants", type=int, default=0)
     parser.add_argument("--random-arc-variants", type=int, default=0)
     parser.add_argument("--launch-samples", type=int, default=0)
+    parser.add_argument("--corridor-episodes-per-course", type=int, default=0)
+    parser.add_argument("--corridor-length", type=int, default=28)
+    parser.add_argument("--corridor-max-lateral-offset-m", type=float, default=2.2)
     parser.add_argument("--off-nominal-episodes-per-course", type=int, default=0)
     parser.add_argument("--off-nominal-length", type=int, default=24)
     parser.add_argument(
@@ -764,6 +859,9 @@ def main() -> int:
                 lookahead_m=args.lookahead_m,
                 camera_tilt_up_rad=math.radians(args.camera_tilt_up_deg),
                 launch_samples=args.launch_samples,
+                corridor_episodes=args.corridor_episodes_per_course,
+                corridor_length=args.corridor_length,
+                corridor_max_lateral_offset_m=args.corridor_max_lateral_offset_m,
                 off_nominal_episodes=args.off_nominal_episodes_per_course,
                 off_nominal_length=args.off_nominal_length,
                 recovery_teacher=args.recovery_teacher,
@@ -789,6 +887,8 @@ def main() -> int:
     print(
         "teacher_augments="
         f"launch_samples={args.launch_samples} "
+        f"corridor_episodes_per_course={args.corridor_episodes_per_course} "
+        f"corridor_length={args.corridor_length} "
         f"off_nominal_episodes_per_course={args.off_nominal_episodes_per_course} "
         f"off_nominal_length={args.off_nominal_length} "
         f"recovery_teacher={args.recovery_teacher}"

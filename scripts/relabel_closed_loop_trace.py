@@ -80,6 +80,10 @@ def as_int(row: dict[str, str], key: str, default: int = 0) -> int:
     return int(value)
 
 
+def split_csv(raw: str) -> set[str]:
+    return {part.strip() for part in raw.split(",") if part.strip()}
+
+
 def read_rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="") as f:
         rows = list(csv.DictReader(f))
@@ -281,6 +285,8 @@ def relabel_rows(
     lookahead_m: float,
     min_confidence: float,
     max_past_gate_m: float,
+    max_reference_error_m: float,
+    allowed_state_command_sources: set[str] | None,
     teacher: str,
     reference_speed_m_s: float,
     reference_samples_per_segment: int,
@@ -299,6 +305,12 @@ def relabel_rows(
     for row in rows:
         mode = row.get("mode", "").strip().lower()
         if mode not in USABLE_MODES:
+            continue
+        command_source = row.get("command_source", "").strip()
+        if (
+            allowed_state_command_sources is not None
+            and command_source not in allowed_state_command_sources
+        ):
             continue
         if as_float(row, "confidence", 0.0) < min_confidence:
             continue
@@ -334,6 +346,8 @@ def relabel_rows(
         )
         reference_sample = reference_samples[reference_idx]
         off_reference_m = float(np.linalg.norm(position - reference_sample.position))
+        if off_reference_m > max_reference_error_m:
+            continue
         rejoin_lookahead_m = float(
             np.clip(2.4 + 0.35 * off_reference_m, 2.2, lookahead_m)
         )
@@ -363,7 +377,7 @@ def relabel_rows(
                 "course": course_name,
                 "episode_id": episode_id,
                 "teacher_phase": f"closed_loop_{teacher}",
-                "command_source": row.get("command_source", "closed_loop"),
+                "command_source": command_source or "closed_loop",
                 "last_gate_passed": str(as_int(row, "last_gate_passed", -1)),
                 "next_gate_index": str(gate.index),
                 "mode": mode,
@@ -439,10 +453,25 @@ def main() -> int:
         default=2.0,
         help="Drop rows this far past an unpassed gate; they are post-miss recovery, not pass-through labels.",
     )
+    parser.add_argument(
+        "--max-reference-error-m",
+        type=float,
+        default=3.0,
+        help="Drop closed-loop states farther than this from the reference line.",
+    )
+    parser.add_argument(
+        "--allowed-state-command-sources",
+        default="",
+        help=(
+            "Comma-separated command_source values to keep from the rollout "
+            "(for example learned). Empty keeps all sources."
+        ),
+    )
     args = parser.parse_args()
 
     rows = read_rows(args.trace)
     episode_id = args.episode_id or f"{args.course}:closed_loop:{args.trace.parent.name}"
+    allowed_sources = split_csv(args.allowed_state_command_sources)
     out_rows = relabel_rows(
         rows,
         course_name=args.course,
@@ -450,6 +479,8 @@ def main() -> int:
         lookahead_m=args.lookahead_m,
         min_confidence=args.min_confidence,
         max_past_gate_m=args.max_past_gate_m,
+        max_reference_error_m=args.max_reference_error_m,
+        allowed_state_command_sources=allowed_sources or None,
         teacher=args.teacher,
         reference_speed_m_s=args.reference_speed_m_s,
         reference_samples_per_segment=args.reference_samples_per_segment,
@@ -468,6 +499,11 @@ def main() -> int:
     print(f"course={args.course}")
     print(f"episode_id={episode_id}")
     print(f"teacher={args.teacher}")
+    print(
+        "allowed_state_command_sources="
+        f"{','.join(sorted(allowed_sources)) if allowed_sources else 'all'}"
+    )
+    print(f"max_reference_error_m={args.max_reference_error_m:g}")
     print(f"rows_in={len(rows)}")
     print(f"rows_relabelled={len(out_rows)}")
     print("student_inputs=original FPV/tracker/telemetry trace columns")

@@ -32,16 +32,21 @@ EPOCHS="${EPOCHS:-20}"
 BATCH_SIZE="${BATCH_SIZE:-256}"
 PHASE_SAMPLING_WEIGHTS="${PHASE_SAMPLING_WEIGHTS:-}"
 MODE_SAMPLING_WEIGHTS="${MODE_SAMPLING_WEIGHTS:-}"
+REQUIRE_PHASES="${REQUIRE_PHASES:-launch,nominal,off_nominal}"
 RECOVERY_TEACHER="${RECOVERY_TEACHER:-rejoin}"
 RANDOM_S_CURVE_VARIANTS="${RANDOM_S_CURVE_VARIANTS:-12}"
 RANDOM_HARD_S_CURVE_VARIANTS="${RANDOM_HARD_S_CURVE_VARIANTS:-0}"
 RANDOM_ARC_VARIANTS="${RANDOM_ARC_VARIANTS:-8}"
+CORRIDOR_EPISODES_PER_COURSE="${CORRIDOR_EPISODES_PER_COURSE:-0}"
+CORRIDOR_LENGTH="${CORRIDOR_LENGTH:-28}"
+CORRIDOR_MAX_LATERAL_OFFSET_M="${CORRIDOR_MAX_LATERAL_OFFSET_M:-2.2}"
 MAX_COMMAND_SATURATION_PCT="${MAX_COMMAND_SATURATION_PCT:-45}"
 
 echo "[CS260C] python=$PYTHON_BIN"
 echo "[CS260C] trace=$TRACE"
 echo "[CS260C] checkpoint=$CHECKPOINT"
 echo "[CS260C] recovery_teacher=$RECOVERY_TEACHER"
+echo "[CS260C] corridor_episodes_per_course=$CORRIDOR_EPISODES_PER_COURSE"
 if [[ -n "$PHASE_SAMPLING_WEIGHTS" || -n "$MODE_SAMPLING_WEIGHTS" ]]; then
   echo "[CS260C] phase_sampling_weights=${PHASE_SAMPLING_WEIGHTS:-none}"
   echo "[CS260C] mode_sampling_weights=${MODE_SAMPLING_WEIGHTS:-none}"
@@ -53,6 +58,9 @@ fi
   --random-hard-s-curve-variants "$RANDOM_HARD_S_CURVE_VARIANTS" \
   --random-arc-variants "$RANDOM_ARC_VARIANTS" \
   --launch-samples 24 \
+  --corridor-episodes-per-course "$CORRIDOR_EPISODES_PER_COURSE" \
+  --corridor-length "$CORRIDOR_LENGTH" \
+  --corridor-max-lateral-offset-m "$CORRIDOR_MAX_LATERAL_OFFSET_M" \
   --off-nominal-episodes-per-course 4 \
   --off-nominal-length 24 \
   --recovery-teacher "$RECOVERY_TEACHER" \
@@ -68,7 +76,7 @@ fi
 "$PYTHON_BIN" scripts/audit_teacher_quality_gate.py \
   --trace "$TRACE" \
   --require-courses easy,circular_arc,s_curve \
-  --require-phases launch,nominal,off_nominal \
+  --require-phases "$REQUIRE_PHASES" \
   --allowed-command-sources teacher \
   --max-command-saturation-pct "$MAX_COMMAND_SATURATION_PCT"
 
