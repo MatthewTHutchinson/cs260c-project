@@ -327,3 +327,41 @@ hard-curve imitation metric and learned the relabeled failure states well. It
 does not yet prove closed-loop completion on curved tracks; the next validation
 step is to rerun the learned suite with the new NPZ and either a longer timeout
 or faster non-interactive Elodin settings.
+
+Follow-up validation with the new NPZ used an absolute checkpoint path and an
+8 s `s_curve` run:
+
+```bash
+CS260C_LEARNED_CONTROLLER_CHECKPOINT=/Users/matthewhutchinson/dev/cs260c-project/logs/learning_smoke/feature_bc_curve_stress_rejoin_plus_relabels_no_prev_no_seq_20e.npz \
+ELODIN_LEARNED_COURSES=s_curve \
+ELODIN_LEARNED_CAMERA_PROFILES=vq1_pinhole \
+ELODIN_LEARNED_OUT_DIR=logs/elodin_curve_stress_dagger_validation \
+ELODIN_LEARNED_SIM_TIME=8 \
+ELODIN_LEARNED_TIMEOUT_S=300 \
+ELODIN_LEARNED_FRAME_STRIDE=6 \
+ELODIN_REAL_TIME=0 \
+ELODIN_INTERACTIVE=0 \
+scripts/run_elodin_learned_suite.sh
+```
+
+Result:
+
+```text
+vq1_pinhole/s_curve: DNF gates=0/5 lap_time=8.00
+trace rows=504, fresh FPV rows=194
+final position=(24.90, -4.93, 1.20) m
+max last_gate_passed=-1
+```
+
+This is the important closed-loop lesson: lower offline MSE did not translate
+to better racing behavior. The relabeled policy missed gate 0 laterally instead
+of passing the first two gates like the pre-relabel checkpoint did in its
+partial run. The next iteration should therefore tune data weighting and teacher
+behavior, not simply add more epochs:
+
+```text
+1. downweight or filter relabel rows that teach recovery after a missed gate 0
+2. add explicit first-gate corridor/launch examples with lateral offsets
+3. reduce aggressive lateral/yaw commands before the Betaflight adapter
+4. rerun short closed-loop validation before accepting the checkpoint
+```
