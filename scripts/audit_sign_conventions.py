@@ -179,6 +179,18 @@ def main() -> int:
             timestamp_s=1.0 + controller.gains.search_settle_s + 0.3,
         ),
     )
+    braking_priority_cmd = controller.compute(
+        search_gate,
+        VehicleTelemetry(
+            rpy_rad=np.array([0.0, -0.25, 0.0]),
+            linear_velocity_m_s=np.array([2.5, 0.0, 0.0]),
+            timestamp_s=1.0 + controller.gains.search_settle_s + 0.4,
+        ),
+    )
+    expected_brake_pitch = min(
+        controller.gains.search_max_velocity_brake_rate_rad_s,
+        controller.gains.search_forward_velocity_damping * 2.5,
+    )
 
     observed = first_non_search(args.trace)
 
@@ -250,6 +262,12 @@ def main() -> int:
         f"yaw={moving_search_cmd.yaw_rate_rad_s:.3f} "
         f"thrust={moving_search_cmd.thrust_norm:.3f}"
     )
+    print(
+        "braking_priority_search_command="
+        f"expected_pitch={expected_brake_pitch:.3f} "
+        f"pitch={braking_priority_cmd.pitch_rate_rad_s:.3f} "
+        f"yaw={braking_priority_cmd.yaw_rate_rad_s:.3f}"
+    )
 
     failures = []
     if "CAM_TILT_UP_DEG" not in elodin_pitch_offset(args.elodin_camera):
@@ -291,6 +309,10 @@ def main() -> int:
         failures.append("rightward search drift should command negative roll-rate braking")
     if abs(moving_search_cmd.yaw_rate_rad_s) > 1e-9:
         failures.append("moving search should brake before starting yaw scan")
+    if abs(braking_priority_cmd.pitch_rate_rad_s - expected_brake_pitch) > 1e-9:
+        failures.append("moving pitched search should prioritize braking before leveling")
+    if abs(braking_priority_cmd.yaw_rate_rad_s) > 1e-9:
+        failures.append("moving pitched search should not yaw until braking and leveling are done")
 
     if failures:
         print("verdict=FAIL")

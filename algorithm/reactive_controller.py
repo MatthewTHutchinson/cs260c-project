@@ -107,14 +107,20 @@ class ReactiveGateController:
             self._search_started_s = now_s
         search_elapsed_s = max(0.0, now_s - self._search_started_s)
 
-        pitch_level_rate = self._search_pitch_level_rate(telemetry)
         roll_brake_rate, pitch_brake_rate = self._search_velocity_brake_rates(telemetry)
-        pitch_rate = pitch_level_rate + pitch_brake_rate
+        is_settled = self._search_velocity_is_settled(telemetry)
+
+        # Prioritize braking: only apply leveling if the drone has settled.
+        if is_settled:
+            pitch_level_rate = self._search_pitch_level_rate(telemetry)
+            pitch_rate = pitch_level_rate + pitch_brake_rate
+        else:
+            pitch_rate = pitch_brake_rate
+
         is_level = (
             abs(self._body_forward_elevation(telemetry))
             <= self.gains.search_level_tolerance_rad
         )
-        is_settled = self._search_velocity_is_settled(telemetry)
         yaw_rate = (
             self.gains.search_yaw_rate_rad_s
             if search_elapsed_s >= self.gains.search_settle_s and is_level and is_settled
