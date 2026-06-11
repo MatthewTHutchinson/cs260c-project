@@ -1,0 +1,7 @@
+course,role,rows,gates,phase_counts
+easy,train base,390,3,"launch:24, nominal:270, off_nominal:96"
+lateral_soft,train base,390,3,"launch:24, nominal:270, off_nominal:96"
+low_high,train base,390,3,"launch:24, nominal:270, off_nominal:96"
+four_gate_straight,train base,480,4,"launch:24, nominal:360, off_nominal:96"
+circular_arc,train base,480,4,"launch:24, nominal:360, off_nominal:96"
+s_curve,held-out test,570,5,"launch:24, nominal:450, off_nominal:96"

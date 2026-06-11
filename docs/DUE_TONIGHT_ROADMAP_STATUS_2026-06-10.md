@@ -91,7 +91,22 @@ Useful figures:
 ```text
 logs/learning_smoke/feature_bc_augmented_rejoin_no_prev_no_seq_leave_s_curve_out_20e_s_curve_audit.png
 logs/controller_comparison/s_curve_rejoin_no_prev_no_seq_npz_comparison.png
+assets/presentation/teacher_racing_lines_base.png
+assets/presentation/teacher_racing_lines_full.png
 ```
+
+The teacher racing-line plots show the nominal privileged teacher path, gates,
+lookahead targets, launch samples, and off-nominal recovery samples. The base
+plot marks `s_curve` as the held-out test course; the full plot shows the
+randomized S-curve and arc augmentation courses used for training diversity.
+
+Current gate-normal status: gate yaw/normal information is logged and visualized
+with arrows, but the current `rejoin` teacher is primarily a gate-center and
+path-tangent reference. It does not yet impose a hard "cross the gate plane from
+the normal-facing side" constraint. That is acceptable for the current monotonic
+debug tracks, where the centerline already moves forward through the gates, but
+future minimum-snap/MPPI teacher upgrades should explicitly constrain gate plane
+crossing direction.
 
 ## Search-Mode Fix
 
