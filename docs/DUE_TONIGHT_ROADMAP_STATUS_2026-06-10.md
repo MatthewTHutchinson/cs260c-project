@@ -150,3 +150,85 @@ Do not claim:
 3. Relabel those states with the privileged rejoin/minimum-snap teacher.
 4. Retrain and evaluate with closed-loop completion as the primary metric.
 5. Start PPO only after BC/DAgger completes simple courses reliably.
+
+## Curve-Stress Follow-Up
+
+The next planned step is to make the BC/DAgger curriculum harder before moving
+to PPO. The new curve-stress path adds generated hard S-curve tracks, keeps one
+hard S-curve held out, and still uses the same legal no-prev/no-sequence feature
+policy.
+
+Command:
+
+```bash
+scripts/run_curve_stress_ablation.sh
+```
+
+Dataset and split:
+
+```text
+rows=20100
+courses=34
+randomized_courses=s_curve=12 hard_s_curve=8 arc=8
+held_out_test=hard_s_curve_rand_000
+selected_student_features=no_prev_command,no_sequence,no_privileged
+```
+
+FOV audit:
+
+```text
+vq1_pinhole:
+  fov_h=90.0 deg
+  fov_v=58.7 deg
+  next_gate_visible=98.7%
+  lookahead_visible=94.5%
+  heldout_hard_s_curve_lookahead_visible=80.9%
+
+gatenet_fisheye:
+  fov_h=144.0 deg
+  fov_v=120.0 deg
+  next_gate_visible=99.7%
+  lookahead_visible=99.8%
+  heldout_hard_s_curve_lookahead_visible=99.9%
+```
+
+Interpretation: VQ1 pinhole still sees the next gate on almost every row, so
+the current generated curriculum is not simply impossible for the default
+camera. However, hard-curve lookahead visibility is much weaker under the VQ1
+pinhole profile. Wider FOV mainly helps the policy see farther around hard
+turns, which should reduce search/reacquire pressure if the simulator/runtime
+allows that profile. For official-facing work, keep `vq1_pinhole` as the
+default and treat `gatenet_fisheye` as an experimental robustness/perception
+profile.
+
+Curve-stress GRU result:
+
+```text
+best_val_mse=0.00239038
+heldout_hard_s_curve_mse=0.00488088
+mae_roll_rate=0.049753
+mae_pitch_rate=0.015837
+mae_yaw_rate=0.070776
+mae_thrust=0.009056
+
+learned_vs_teacher mse=0.00472749
+reactive_vs_teacher mse=0.25170771
+
+phase=off_nominal:
+  learned_vs_teacher mse=0.02099945
+  reactive_vs_teacher mse=0.05009868
+```
+
+Useful curve-stress assets:
+
+```text
+assets/presentation/teacher_racing_lines_curve_stress_full.png
+assets/presentation/teacher_racing_lines_curve_stress_summary.csv
+assets/presentation/fov_visibility_curve_stress_summary.csv
+logs/controller_comparison/hard_s_curve_rejoin_no_prev_no_seq_npz_comparison.png
+```
+
+PPO should still wait. The curve-stress BC result is good enough to justify the
+next data step, but not enough to skip closed-loop relabeling. The correct order
+is hard-curve BC, closed-loop failure collection/relabeling, then PPO only once
+the policy completes simple and moderate curved tracks reliably.

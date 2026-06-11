@@ -33,6 +33,10 @@ BATCH_SIZE="${BATCH_SIZE:-256}"
 PHASE_SAMPLING_WEIGHTS="${PHASE_SAMPLING_WEIGHTS:-}"
 MODE_SAMPLING_WEIGHTS="${MODE_SAMPLING_WEIGHTS:-}"
 RECOVERY_TEACHER="${RECOVERY_TEACHER:-rejoin}"
+RANDOM_S_CURVE_VARIANTS="${RANDOM_S_CURVE_VARIANTS:-12}"
+RANDOM_HARD_S_CURVE_VARIANTS="${RANDOM_HARD_S_CURVE_VARIANTS:-0}"
+RANDOM_ARC_VARIANTS="${RANDOM_ARC_VARIANTS:-8}"
+MAX_COMMAND_SATURATION_PCT="${MAX_COMMAND_SATURATION_PCT:-45}"
 
 echo "[CS260C] python=$PYTHON_BIN"
 echo "[CS260C] trace=$TRACE"
@@ -45,8 +49,9 @@ fi
 
 "$PYTHON_BIN" scripts/generate_privileged_teacher_dataset.py \
   --out "$TRACE" \
-  --random-s-curve-variants 12 \
-  --random-arc-variants 8 \
+  --random-s-curve-variants "$RANDOM_S_CURVE_VARIANTS" \
+  --random-hard-s-curve-variants "$RANDOM_HARD_S_CURVE_VARIANTS" \
+  --random-arc-variants "$RANDOM_ARC_VARIANTS" \
   --launch-samples 24 \
   --off-nominal-episodes-per-course 4 \
   --off-nominal-length 24 \
@@ -64,7 +69,8 @@ fi
   --trace "$TRACE" \
   --require-courses easy,circular_arc,s_curve \
   --require-phases launch,nominal,off_nominal \
-  --allowed-command-sources teacher
+  --allowed-command-sources teacher \
+  --max-command-saturation-pct "$MAX_COMMAND_SATURATION_PCT"
 
 TRAIN_ARGS=(
   --traces "$TRACE"

@@ -320,6 +320,36 @@ def randomized_s_curve(index: int, rng: np.random.Generator) -> tuple[str, tuple
     return f"s_curve_rand_{index:03d}", gates
 
 
+def randomized_hard_s_curve(index: int, rng: np.random.Generator) -> tuple[str, tuple[CourseGate, ...]]:
+    """More aggressive monotonic S-curves for curriculum stress testing.
+
+    These remain forward-progressing in X so the current centerline teacher can
+    generate legal labels, but they use tighter spacing and larger lateral
+    excursions than the standard random S-curve variants. They are not local
+    harness or official VQ1 courses.
+    """
+    gate_count = int(rng.integers(6, 8))
+    spacing = float(rng.uniform(5.4, 7.0))
+    amplitude = float(rng.uniform(2.2, 3.8))
+    phase = float(rng.uniform(-0.45, 0.45))
+    centers: list[tuple[float, float, float]] = []
+    for gate_idx in range(gate_count):
+        x = 10.0 + gate_idx * spacing
+        if gate_idx == 0:
+            y = float(rng.uniform(-0.20, 0.20))
+        else:
+            sign = -1.0 if gate_idx % 2 == 0 else 1.0
+            y = sign * amplitude * float(rng.uniform(0.85, 1.12)) + phase
+        z = 1.8 + float(rng.uniform(-0.25, 0.25))
+        centers.append((x, y, z))
+    yaws = gate_yaws_from_centers(centers)
+    gates = tuple(
+        CourseGate(gate_idx, center, yaw_deg=yaws[gate_idx])
+        for gate_idx, center in enumerate(centers)
+    )
+    return f"hard_s_curve_rand_{index:03d}", gates
+
+
 def randomized_arc(index: int, rng: np.random.Generator) -> tuple[str, tuple[CourseGate, ...]]:
     gate_count = int(rng.integers(4, 6))
     spacing = float(rng.uniform(7.0, 9.0))
@@ -697,6 +727,7 @@ def main() -> int:
     parser.add_argument("--lookahead-m", type=float, default=5.0)
     parser.add_argument("--camera-tilt-up-deg", type=float, default=20.0)
     parser.add_argument("--random-s-curve-variants", type=int, default=0)
+    parser.add_argument("--random-hard-s-curve-variants", type=int, default=0)
     parser.add_argument("--random-arc-variants", type=int, default=0)
     parser.add_argument("--launch-samples", type=int, default=0)
     parser.add_argument("--off-nominal-episodes-per-course", type=int, default=0)
@@ -718,6 +749,8 @@ def main() -> int:
     rng = np.random.default_rng(args.random_seed)
     for i in range(args.random_s_curve_variants):
         course_specs.append(randomized_s_curve(i, rng))
+    for i in range(args.random_hard_s_curve_variants):
+        course_specs.append(randomized_hard_s_curve(i, rng))
     for i in range(args.random_arc_variants):
         course_specs.append(randomized_arc(i, rng))
 
@@ -749,7 +782,9 @@ def main() -> int:
     print(f"courses={len(course_specs)}")
     print(
         "randomized_courses="
-        f"s_curve={args.random_s_curve_variants} arc={args.random_arc_variants}"
+        f"s_curve={args.random_s_curve_variants} "
+        f"hard_s_curve={args.random_hard_s_curve_variants} "
+        f"arc={args.random_arc_variants}"
     )
     print(
         "teacher_augments="
