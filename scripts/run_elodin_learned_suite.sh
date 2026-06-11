@@ -20,6 +20,7 @@ echo "[CS260C] learned device: $CS260C_LEARNED_CONTROLLER_DEVICE"
 "$COURSE_REPO/scripts/run_elodin_course_suite.py" \
   --courses "${ELODIN_LEARNED_COURSES:-easy,lateral_soft,low_high,four_gate_straight,circular_arc,s_curve}" \
   --out-dir "${ELODIN_LEARNED_OUT_DIR:-$COURSE_REPO/logs/elodin_learned_suite}" \
+  --camera-profiles "${ELODIN_LEARNED_CAMERA_PROFILES:-${ELODIN_CAMERA_PROFILE:-vq1_pinhole}}" \
   --sim-time "${ELODIN_LEARNED_SIM_TIME:-18}" \
   --timeout-s "${ELODIN_LEARNED_TIMEOUT_S:-240}" \
   --idle-timeout-s "${ELODIN_LEARNED_IDLE_TIMEOUT_S:-60}" \

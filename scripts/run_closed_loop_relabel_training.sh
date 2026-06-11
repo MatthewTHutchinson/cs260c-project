@@ -35,6 +35,7 @@ MODE_SAMPLING_WEIGHTS="${MODE_SAMPLING_WEIGHTS:-}"
 EPISODE_SAMPLING_WEIGHTS="${EPISODE_SAMPLING_WEIGHTS:-}"
 COMMAND_SOURCE_SAMPLING_WEIGHTS="${COMMAND_SOURCE_SAMPLING_WEIGHTS:-}"
 TRACE_SAMPLING_WEIGHTS="${TRACE_SAMPLING_WEIGHTS:-}"
+MAX_COMMAND_SATURATION_PCT="${MAX_COMMAND_SATURATION_PCT:-45}"
 
 if [[ ! -f "$BASE_TRACE" ]]; then
   echo "[CS260C] missing BASE_TRACE=$BASE_TRACE" >&2
@@ -60,6 +61,7 @@ echo "[CS260C] python=$PYTHON_BIN"
 echo "[CS260C] base_trace=$BASE_TRACE"
 echo "[CS260C] relabel_count=${#RELABEL_ARGS[@]}"
 echo "[CS260C] checkpoint=$CHECKPOINT"
+echo "[CS260C] max_command_saturation_pct=$MAX_COMMAND_SATURATION_PCT"
 if [[ -n "$PHASE_SAMPLING_WEIGHTS" || -n "$MODE_SAMPLING_WEIGHTS" || -n "$EPISODE_SAMPLING_WEIGHTS" || -n "$COMMAND_SOURCE_SAMPLING_WEIGHTS" || -n "$TRACE_SAMPLING_WEIGHTS" ]]; then
   echo "[CS260C] phase_sampling_weights=${PHASE_SAMPLING_WEIGHTS:-none}"
   echo "[CS260C] mode_sampling_weights=${MODE_SAMPLING_WEIGHTS:-none}"
@@ -79,7 +81,8 @@ fi
   --trace "$BASE_TRACE" \
   --require-courses easy,circular_arc,s_curve \
   --require-phases launch,nominal,off_nominal \
-  --allowed-command-sources teacher
+  --allowed-command-sources teacher \
+  --max-command-saturation-pct "$MAX_COMMAND_SATURATION_PCT"
 
 TRAIN_ARGS=(
   "${TRACE_ARGS[@]}"

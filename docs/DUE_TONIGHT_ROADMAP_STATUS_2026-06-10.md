@@ -232,3 +232,47 @@ PPO should still wait. The curve-stress BC result is good enough to justify the
 next data step, but not enough to skip closed-loop relabeling. The correct order
 is hard-curve BC, closed-loop failure collection/relabeling, then PPO only once
 the policy completes simple and moderate curved tracks reliably.
+
+## Curve-Stress DAgger Next Commands
+
+Generated `hard_s_curve_rand_*` courses are currently offline teacher
+curriculum, not simulator courses. Until matching simulator tracks exist,
+closed-loop DAgger should use the hardest available harness courses:
+`circular_arc` and `s_curve`.
+
+Run the curve-stress checkpoint in closed loop:
+
+```bash
+scripts/run_curve_stress_closed_loop.sh
+```
+
+Useful overrides:
+
+```bash
+ELODIN_LEARNED_CAMERA_PROFILES=vq1_pinhole,gatenet_fisheye \
+ELODIN_LEARNED_COURSES=circular_arc,s_curve \
+scripts/run_curve_stress_closed_loop.sh
+```
+
+Then relabel those rollouts and retrain against the curve-stress base teacher:
+
+```bash
+scripts/relabel_curve_stress_rollouts.sh
+```
+
+This produces relabel CSVs under:
+
+```text
+logs/privileged_teacher/closed_loop_relabels/curve_stress/
+```
+
+and trains:
+
+```text
+logs/learning_smoke/feature_bc_curve_stress_rejoin_plus_relabels_no_prev_no_seq_20e.pt
+logs/learning_smoke/feature_bc_curve_stress_rejoin_plus_relabels_no_prev_no_seq_20e.npz
+```
+
+The relabel-training wrapper keeps `hard_s_curve_rand_000` as the offline
+held-out curve test so closed-loop harness relabels do not silently destroy the
+hard-curve imitation result.
