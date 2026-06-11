@@ -276,3 +276,54 @@ logs/learning_smoke/feature_bc_curve_stress_rejoin_plus_relabels_no_prev_no_seq_
 The relabel-training wrapper keeps `hard_s_curve_rand_000` as the offline
 held-out curve test so closed-loop harness relabels do not silently destroy the
 hard-curve imitation result.
+
+## Curve-Stress DAgger Run - 2026-06-10 Evening
+
+`scripts/run_curve_stress_closed_loop.sh` produced usable FPV/debug traces, but
+the Mac Elodin editor run timed out before a formal `[RACE]` summary:
+
+```text
+logs/elodin_curve_stress_learned_suite/summary.csv
+vq1_pinhole/circular_arc: NO_SUMMARY, timed_out=True, trace to 7.34 s
+vq1_pinhole/s_curve:      NO_SUMMARY, timed_out=True, trace to 6.98 s
+```
+
+This is infrastructure evidence, not a clean race result. The traces are still
+useful DAgger failure states because they contain FPV/tracker features,
+telemetry, and `debug_world_*` columns for offline privileged relabeling.
+
+Observed partial closed-loop behavior:
+
+```text
+circular_arc: 453 trace rows, 174 fresh FPV rows, 0 gates passed by timeout
+s_curve:      425 trace rows, 163 fresh FPV rows, gates 0 and 1 passed
+```
+
+`scripts/relabel_curve_stress_rollouts.sh` then generated:
+
+```text
+logs/privileged_teacher/closed_loop_relabels/curve_stress/circular_arc_vq1_pinhole_curve_stress_rejoin.csv
+rows_relabelled=373
+
+logs/privileged_teacher/closed_loop_relabels/curve_stress/s_curve_vq1_pinhole_curve_stress_rejoin.csv
+rows_relabelled=425
+```
+
+The follow-up retrain produced:
+
+```text
+logs/learning_smoke/feature_bc_curve_stress_rejoin_plus_relabels_no_prev_no_seq_20e.pt
+logs/learning_smoke/feature_bc_curve_stress_rejoin_plus_relabels_no_prev_no_seq_20e.npz
+
+best_val_mse=0.00217362
+heldout_hard_s_curve_rand_000_mse=0.00436968
+closed_loop_relabel_mse=0.00166311
+circular_arc_relabel_mse=0.00055431
+s_curve_relabel_mse=0.00263625
+```
+
+Interpretation: the first DAgger iteration improved the offline held-out
+hard-curve imitation metric and learned the relabeled failure states well. It
+does not yet prove closed-loop completion on curved tracks; the next validation
+step is to rerun the learned suite with the new NPZ and either a longer timeout
+or faster non-interactive Elodin settings.
