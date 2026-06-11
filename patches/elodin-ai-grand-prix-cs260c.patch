@@ -1706,10 +1706,10 @@ index ddc6bce..60787d7 100644
  ]
 diff --git a/solver/cs260c_pilot.py b/solver/cs260c_pilot.py
 new file mode 100644
-index 0000000..4566ad4
+index 0000000..e6e5847
 --- /dev/null
 +++ b/solver/cs260c_pilot.py
-@@ -0,0 +1,382 @@
+@@ -0,0 +1,406 @@
 +"""CS 260C perception-guided racing pilot for the Elodin harness.
 +
 +This solver deliberately ignores Elodin's world pose. It consumes only the FPV
@@ -1771,6 +1771,17 @@ index 0000000..4566ad4
 +RC_PITCH_SCALE = _env_float("CS260C_BETAFLIGHT_PITCH_SCALE", 350.0)
 +RC_YAW_SCALE = _env_float("CS260C_BETAFLIGHT_YAW_SCALE", 350.0)
 +RC_THROTTLE_SCALE = _env_float("CS260C_BETAFLIGHT_THROTTLE_SCALE", 1000.0)
++LEARNED_MAX_ABS_BEARING_H_RAD = _env_float(
++    "CS260C_LEARNED_MAX_ABS_BEARING_H_RAD", 0.45
++)
++LEARNED_MAX_ABS_BEARING_V_RAD = _env_float(
++    "CS260C_LEARNED_MAX_ABS_BEARING_V_RAD", 0.50
++)
++LEARNED_MAX_DISTANCE_M = _env_float("CS260C_LEARNED_MAX_DISTANCE_M", 8.0)
++LEARNED_MIN_CONFIDENCE = _env_float("CS260C_LEARNED_MIN_CONFIDENCE", 0.35)
++LEARNED_MAX_ABS_LATERAL_VELOCITY_M_S = _env_float(
++    "CS260C_LEARNED_MAX_ABS_LATERAL_VELOCITY_M_S", 2.0
++)
 +
 +
 +def _build_pilot() -> AutonomousRacingPilot:
@@ -1812,11 +1823,24 @@ index 0000000..4566ad4
 +        f"roll={RC_ROLL_SCALE:g} pitch={RC_PITCH_SCALE:g} "
 +        f"yaw={RC_YAW_SCALE:g} throttle={RC_THROTTLE_SCALE:g}"
 +    )
++    print(
++        "[CS260C] learned envelope: "
++        f"|bearing_h|<={LEARNED_MAX_ABS_BEARING_H_RAD:g} "
++        f"|bearing_v|<={LEARNED_MAX_ABS_BEARING_V_RAD:g} "
++        f"distance<={LEARNED_MAX_DISTANCE_M:g} "
++        f"confidence>={LEARNED_MIN_CONFIDENCE:g} "
++        f"|body_vy|<={LEARNED_MAX_ABS_LATERAL_VELOCITY_M_S:g}"
++    )
 +    return AutonomousRacingPilot(
 +        tracker=tracker,
 +        controller=controller,
 +        learned_controller=learned_controller,
 +        frame_format="rgb",
++        learned_max_abs_bearing_h_rad=LEARNED_MAX_ABS_BEARING_H_RAD,
++        learned_max_abs_bearing_v_rad=LEARNED_MAX_ABS_BEARING_V_RAD,
++        learned_max_distance_m=LEARNED_MAX_DISTANCE_M,
++        learned_min_confidence=LEARNED_MIN_CONFIDENCE,
++        learned_max_abs_lateral_velocity_m_s=LEARNED_MAX_ABS_LATERAL_VELOCITY_M_S,
 +    )
 +
 +
