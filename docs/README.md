@@ -7,6 +7,7 @@ active repo. Older strategy notes should stay out of the current project path.
 
 ## Active Docs
 
+- `ARCHIVE_AND_RESTART.md`: durable backup inventory and exact instructions for recreating the project after local deletion.
 - `GROUND_UP_RESTART.md`: active project planning/direction doc, reset decision, new architecture, and immediate priorities.
 - `PROJECT_STRUCTURE.md`: where current, reference, and legacy project files belong.
 - `AUTONOMOUS_RACING_ALGORITHM.md`: final-project-facing description of the current FPV gate-tracking and body-rate/thrust racing algorithm.

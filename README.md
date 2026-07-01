@@ -26,11 +26,12 @@ repo. Do not use it as the final-project claim or current implementation path.
 
 Read these in order:
 
-1. `docs/AUTONOMOUS_RACING_ALGORITHM.md`
-2. `docs/ELODIN_PRACTICE_HARNESS.md`
-3. `docs/FINAL_PRESENTATION_DECK.md`
-4. `docs/COMPETITION_CONTEXT.md`
-5. `docs/VQ1_ACCESS_RUNBOOK.md`
+1. `docs/ARCHIVE_AND_RESTART.md`
+2. `docs/AUTONOMOUS_RACING_ALGORITHM.md`
+3. `docs/ELODIN_PRACTICE_HARNESS.md`
+4. `docs/FINAL_PRESENTATION_DECK.md`
+5. `docs/COMPETITION_CONTEXT.md`
+6. `docs/VQ1_ACCESS_RUNBOOK.md`
 
 ## Local Simulation Harness
 

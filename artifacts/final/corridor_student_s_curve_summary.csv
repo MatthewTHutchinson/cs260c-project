@@ -1,0 +1,2 @@
+camera_profile,course,completed,status,passed,total,lap_time,pass_times,timed_out,idle_timed_out,elapsed_wall_s,race_summary,trace,log,frames
+vq1_pinhole,s_curve,,,,,,,True,False,301.5,,/Users/matthewhutchinson/dev/cs260c-project/logs/elodin_curve_stress_corridor_validation/vq1_pinhole/s_curve/trace.csv,/Users/matthewhutchinson/dev/cs260c-project/logs/elodin_curve_stress_corridor_validation/vq1_pinhole/s_curve/editor.log,/Users/matthewhutchinson/dev/cs260c-project/logs/elodin_curve_stress_corridor_validation/vq1_pinhole/s_curve/frames
