@@ -17,6 +17,8 @@ checkpoints, and key result traces are stored here.
 - `overleaf_final/`: final report source and figures.
 - `patches/elodin-ai-grand-prix-cs260c.patch`: all local changes to the external
   Elodin practice harness, including the CS260C solver.
+- `patches/gym-pybullet-drones-local.patch.gz`: the remaining local changes from
+  the historical PyBullet checkout, preserved before that checkout was deleted.
 - `environment.yml`: snapshot of the known-good macOS Conda environment.
 - `artifacts/final/`: compact final dataset, checkpoints, and representative
   closed-loop traces used by the report.

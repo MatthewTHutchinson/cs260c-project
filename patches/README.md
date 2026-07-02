@@ -27,3 +27,23 @@ git apply /Users/matthewhutchinson/dev/cs260c-project/patches/elodin-ai-grand-pr
 ```
 
 The Betaflight submodule may still show local build changes after `scripts/build_betaflight.sh`; those are build artifacts and are not part of this patch.
+
+## `gym-pybullet-drones-local.patch.gz`
+
+Final local changes from the standalone checkout that was removed during
+project archival. The patch was generated against upstream commit:
+
+```text
+82b0fda6d005b287cdc1ef0c313d09a361027c45
+```
+
+Restore with:
+
+```bash
+git clone https://github.com/utiasDSL/gym-pybullet-drones.git
+cd gym-pybullet-drones
+git checkout 82b0fda6d005b287cdc1ef0c313d09a361027c45
+gzip -dc ../cs260c-project/patches/gym-pybullet-drones-local.patch.gz | git apply -
+```
+
+This checkout is historical and is not the active project direction.
